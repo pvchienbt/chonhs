@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Học sinh may mắn - Notion Version</title>
+    <title>Học sinh may mắn - V1</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MediaPipe -->
     <script async src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js"></script>
     <!-- Thư viện đọc Excel (SheetJS) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Thư viện đọc Word (Mammoth) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #87CEEB; }
@@ -27,15 +29,14 @@
             position: absolute;
             bottom: 20px;
             right: 20px;
-            width: 160px; /* Nhỏ hơn chút cho Notion */
-            height: 120px;
-            border-radius: 12px;
+            width: 200px;
+            height: 150px;
+            border-radius: 15px;
             overflow: hidden;
-            border: 3px solid white;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border: 4px solid white;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
             z-index: 20;
             background: black;
-            transition: opacity 0.3s;
         }
         #camera-feed {
             width: 100%;
@@ -45,27 +46,27 @@
         }
         .cam-label {
             position: absolute;
-            bottom: 3px;
-            right: 3px;
+            bottom: 5px;
+            right: 5px;
             background: rgba(0,0,0,0.6);
             color: white;
-            font-size: 9px;
-            padding: 1px 4px;
-            border-radius: 3px;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
         }
 
         /* Nút Menu Cài Đặt */
         #menu-btn {
             position: absolute;
-            top: 15px;
-            left: 15px;
+            top: 20px;
+            left: 20px;
             z-index: 40;
             background: white;
             border: none;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            font-size: 20px;
+            width: 50px;
+            height: 50px;
+            font-size: 24px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
             cursor: pointer;
             transition: transform 0.2s, background 0.2s;
@@ -81,19 +82,19 @@
         /* UI Panel (Settings) */
         #ui-panel {
             position: absolute;
-            top: 65px;
-            left: 15px;
+            top: 80px;
+            left: 20px;
             background: rgba(255, 255, 255, 0.95);
             padding: 15px;
             border-radius: 15px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            width: 300px; /* Gọn hơn cho embed */
+            width: 340px;
             z-index: 30;
             backdrop-filter: blur(5px);
             border: 2px solid #e2e8f0;
             transition: opacity 0.3s, transform 0.3s;
             transform-origin: top left;
-            max-height: 80vh; 
+            max-height: 85vh; 
             overflow-y: auto; 
         }
         
@@ -117,65 +118,48 @@
         }
 
         /* Scrollbar styling */
-        #ui-panel::-webkit-scrollbar { width: 4px; }
+        #ui-panel::-webkit-scrollbar { width: 6px; }
         #ui-panel::-webkit-scrollbar-track { background: transparent; }
-        #ui-panel::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
-
-        /* Nút Fullscreen */
-        #fullscreen-btn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            z-index: 40;
-            background: white;
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            font-size: 20px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+        #ui-panel::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
     </style>
 </head>
 <body>
 
     <!-- Loading Screen -->
     <div id="loading">
-        <div class="text-5xl mb-4 animate-bounce">🎨</div>
-        <h1 class="text-xl font-bold text-blue-600 mb-2">Nông Trại May Mắn</h1>
-        <p id="loading-status" class="text-sm text-gray-600">Đang khởi tạo...</p>
+        <div class="text-6xl mb-4 animate-bounce">🎨</div>
+        <h1 class="text-2xl font-bold text-blue-600 mb-2">Nông Trại May Mắn</h1>
+        <p id="loading-status" class="text-gray-600">Đang khởi tạo cấu hình lớp học...</p>
     </div>
 
     <!-- Nút Mở Menu -->
     <button id="menu-btn" title="Cài đặt">⚙️</button>
-    
-    <!-- Nút Fullscreen (Hữu ích khi embed nhỏ) -->
-    <button id="fullscreen-btn" title="Toàn màn hình">⛶</button>
 
     <!-- UI Panel (Cài đặt) -->
     <div id="ui-panel" class="panel-hidden">
-        <h1 class="text-lg font-bold text-green-700 flex items-center gap-2 mb-3">
+        <h1 class="text-xl font-bold text-green-700 flex items-center gap-2 mb-4">
             <span>🌻</span> Quản lý lớp học
         </h1>
         
-        <div class="space-y-3">
+        <div class="space-y-4">
             <!-- Khu vực CHỌN LỚP -->
-            <div class="bg-green-50 p-2 rounded-lg border border-green-100">
-                <label class="block text-[10px] font-bold text-green-800 mb-1">🏫 CHỌN LỚP:</label>
-                <div class="flex gap-2 mb-2">
-                    <select id="classSelector" class="flex-1 p-1 text-sm rounded border border-gray-300 focus:outline-none focus:border-green-500">
+            <div class="bg-green-50 p-3 rounded-lg border border-green-100">
+                <label class="block text-xs font-bold text-green-800 mb-1">🏫 Chọn lớp đang dạy:</label>
+                <div class="flex gap-2">
+                    <select id="classSelector" class="flex-1 p-2 text-sm rounded border border-gray-300 focus:outline-none focus:border-green-500">
                         <option value="Lớp mặc định">Lớp mặc định</option>
                     </select>
-                    <button id="deleteClassBtn" class="bg-red-100 hover:bg-red-200 text-red-600 p-1 px-2 rounded border border-red-200 text-[10px] font-bold">XÓA</button>
+                    <button id="deleteClassBtn" class="bg-red-100 hover:bg-red-200 text-red-600 p-2 rounded border border-red-200 transition-all text-xs font-bold" title="Xóa lớp này">
+                        XÓA LỚP
+                    </button>
                 </div>
                 
-                <div class="flex gap-2">
-                    <input type="text" id="newClassName" class="flex-1 p-1 text-sm rounded border border-gray-300 focus:outline-none focus:border-green-500" placeholder="Thêm lớp mới...">
-                    <button id="addClassBtn" class="bg-green-600 hover:bg-green-700 text-white px-2 rounded text-sm font-bold">+</button>
+                <div class="mt-3 pt-3 border-t border-green-200">
+                    <label class="block text-xs font-bold text-green-800 mb-1">➕ Thêm lớp mới:</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="newClassName" class="flex-1 p-2 text-sm rounded border border-gray-300 focus:outline-none focus:border-green-500" placeholder="Tên lớp (VD: 1A)">
+                        <button id="addClassBtn" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm font-bold shadow-sm">Thêm</button>
+                    </div>
                 </div>
             </div>
 
@@ -183,22 +167,23 @@
 
             <!-- Khu vực: Nhập từ File -->
             <div class="flex gap-2">
-                <label class="flex-1 cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-2 py-2 rounded-lg text-xs text-center font-medium transition shadow-sm flex flex-col justify-center items-center">
-                    <span>📂 Excel/Txt</span>
-                    <input type="file" id="fileInput" accept=".txt,.csv,.xlsx,.xls" class="hidden">
+                <label class="flex-1 cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-2 py-2 rounded-lg text-sm text-center font-medium transition shadow-sm flex flex-col justify-center items-center gap-0.5 leading-tight">
+                    <span>📂 Tải File Tên</span>
+                    <span class="text-[10px] opacity-80 font-normal">Excel, Word, TXT</span>
+                    <input type="file" id="fileInput" accept=".txt,.csv,.xlsx,.xls,.docx" class="hidden">
                 </label>
-                <button id="resetBtn" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg text-xs font-medium transition shadow-sm" title="Xóa danh sách hiện tại">
-                    🔄 Reset
+                <button id="resetBtn" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition shadow-sm" title="Xóa hết danh sách lớp hiện tại">
+                    🔄 Xóa hết
                 </button>
             </div>
 
             <!-- Khu vực: Nhạc & Nền -->
             <div class="grid grid-cols-2 gap-2">
-                <label class="cursor-pointer bg-purple-500 hover:bg-purple-600 text-white px-2 py-2 rounded-lg text-xs text-center font-medium transition shadow-sm flex items-center justify-center gap-1">
+                <label class="cursor-pointer bg-purple-500 hover:bg-purple-600 text-white px-2 py-2 rounded-lg text-sm text-center font-medium transition shadow-sm flex items-center justify-center gap-1" title="Tải nhạc nền">
                     <span>🎵 Nhạc</span>
                     <input type="file" id="bgmInput" accept="audio/*" class="hidden">
                 </label>
-                <label class="cursor-pointer bg-teal-500 hover:bg-teal-600 text-white px-2 py-2 rounded-lg text-xs text-center font-medium transition shadow-sm flex items-center justify-center gap-1">
+                <label class="cursor-pointer bg-teal-500 hover:bg-teal-600 text-white px-2 py-2 rounded-lg text-sm text-center font-medium transition shadow-sm flex items-center justify-center gap-1" title="Tải ảnh nền">
                     <span>🖼️ Nền</span>
                     <input type="file" id="bgInput" accept="image/*" class="hidden">
                 </label>
@@ -208,48 +193,62 @@
             <hr class="border-gray-200">
 
             <!-- Khu vực: Nhập Thủ Công -->
-            <div class="bg-blue-50 p-2 rounded-lg border border-blue-100">
-                <label class="block text-[10px] font-bold text-blue-800 mb-1">📝 DANH SÁCH:</label>
-                <textarea id="manualInput" rows="4" class="w-full p-2 text-xs rounded border border-gray-300 focus:outline-none focus:border-blue-500 mb-2" placeholder="Nhập tên, mỗi tên 1 dòng..."></textarea>
+            <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                <label class="block text-xs font-bold text-blue-800 mb-1">📝 Học sinh lớp <span id="currentClassLabel">mặc định</span>:</label>
+                <textarea id="manualInput" rows="5" class="w-full p-2 text-sm rounded border border-gray-300 focus:outline-none focus:border-blue-500 mb-2" placeholder="Nhập tên học sinh..."></textarea>
                 <div class="flex flex-col gap-2">
-                    <button id="manualBtn" class="w-full bg-green-600 hover:bg-green-700 text-white py-1.5 rounded text-xs font-bold transition shadow-sm">
-                        ✅ Cập nhật
+                    <button id="manualBtn" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded text-sm font-bold transition shadow-sm">
+                        ✅ Cập nhật danh sách
                     </button>
-                    <button id="saveLocalBtn" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-1.5 rounded text-xs font-bold transition shadow-sm">
-                        💾 Lưu cài đặt (Browser)
+                    <button id="saveCloudBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded text-sm font-bold transition shadow-sm flex items-center justify-center gap-2">
+                        ☁️ Lưu cấu hình
                     </button>
                 </div>
             </div>
             
-            <p class="text-[9px] text-gray-400 text-center italic mt-1">Dữ liệu được lưu trên trình duyệt này.</p>
+            <p class="text-[10px] text-gray-400 text-center italic">Hệ thống tự động đồng bộ khi thực hiện thay đổi lớp.</p>
         </div>
     </div>
 
     <!-- Trạng thái nổi bật -->
-    <div id="status-container" class="absolute top-5 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none w-full text-center px-4">
-        <div id="status-text" class="inline-block text-xl font-black text-white px-6 py-2 rounded-full bg-black/40 backdrop-blur-md shadow-lg border border-white/20 transition-all whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
+    <div id="status-container" class="absolute top-5 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
+        <div id="status-text" class="text-2xl font-black text-white px-6 py-2 rounded-full bg-black/30 backdrop-blur-md shadow-lg border border-white/20 transition-all">
             Đang tải dữ liệu...
         </div>
     </div>
 
     <!-- BẢN QUYỀN -->
-    <div class="fixed bottom-2 left-4 pointer-events-none z-50">
-        <div class="text-white/40 font-bold text-xs font-mono select-none drop-shadow-md">
-            @NhomCaCon (Notion Edt.)
+    <div class="fixed bottom-3 left-5 pointer-events-none z-50">
+        <div class="text-white/40 font-bold text-sm font-mono tracking-wider select-none drop-shadow-md" style="text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">
+            @NhomCaCon-2025-2026
         </div>
     </div>
 
     <!-- Camera PIP -->
     <div id="camera-container">
         <video id="camera-feed" autoplay playsinline muted></video>
-        <div class="cam-label">AI Cam</div>
+        <div class="cam-label">AI Tracking</div>
     </div>
 
     <!-- Game Canvas -->
     <canvas id="game-canvas"></canvas>
 
+    <!-- Firebase Imports -->
+    <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"
+      }
+    }
+    </script>
+
     <script type="module">
         import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm";
+        import { initializeApp } from 'firebase/app';
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+        import { getFirestore, doc, setDoc, getDoc, collection } from 'firebase/firestore';
 
         // --- HELPER VẼ ---
         function drawCircle(ctx, x, y, r, color, strokeColor = null) {
@@ -280,7 +279,14 @@
         let audioCtx = null;
         let bgImage = null; 
         
-        // State Game - Đã bỏ Firebase
+        // Firebase Config
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // State Game
         const state = {
             classLists: {
                 "Lớp mặc định": ["Nguyễn Văn A", "Trần Thị B", "Lê Văn C", "Hoàng Thị D", "Phạm Văn E", "Vũ Thị F", "Đặng Văn G", "Bùi Thị H"]
@@ -291,7 +297,8 @@
             mode: 'IDLE',
             winners: [],
             cooldown: 0,
-            cameraActive: false
+            user: null,
+            cameraActive: false // Thêm trạng thái camera
         };
 
         let handLandmarker;
@@ -328,7 +335,7 @@
             });
         }
 
-        // --- UI HANDLERS ---
+        // --- CỬ CHỈ & LOGIC ---
         function setupUIHandlers() {
             const classSelector = document.getElementById('classSelector');
             const newClassInput = document.getElementById('newClassName');
@@ -336,9 +343,8 @@
             const deleteClassBtn = document.getElementById('deleteClassBtn');
             const manualInput = document.getElementById('manualInput');
             const manualBtn = document.getElementById('manualBtn');
-            const saveLocalBtn = document.getElementById('saveLocalBtn');
+            const saveCloudBtn = document.getElementById('saveCloudBtn');
             const resetBtn = document.getElementById('resetBtn');
-            const fileInput = document.getElementById('fileInput');
 
             const updateClassSelectorUI = () => {
                 classSelector.innerHTML = '';
@@ -349,6 +355,7 @@
                     opt.selected = name === state.currentClass;
                     classSelector.appendChild(opt);
                 });
+                document.getElementById('currentClassLabel').innerText = state.currentClass;
                 manualInput.value = (state.classLists[state.currentClass] || []).join('\n');
             };
 
@@ -368,7 +375,7 @@
                     newClassInput.value = '';
                     updateClassSelectorUI();
                     resetGame();
-                    saveToLocal(false);
+                    saveToCloud(false);
                 }
             });
 
@@ -376,28 +383,36 @@
             deleteClassBtn.addEventListener('click', () => {
                 const keys = Object.keys(state.classLists);
                 if (keys.length <= 1) {
-                    showStatus("Cần giữ ít nhất 1 lớp!", "#ef4444");
+                    showStatus("Cần giữ ít nhất 1 lớp học!", "#ef4444");
                     return;
                 }
+
                 if (!deleteConfirmMode) {
                     deleteConfirmMode = true;
-                    deleteClassBtn.innerText = "XÁC NHẬN?";
-                    deleteClassBtn.classList.add('bg-red-500', 'text-white');
+                    deleteClassBtn.innerText = "XÁC NHẬN XÓA?";
+                    deleteClassBtn.classList.replace('bg-red-100', 'bg-red-600');
+                    deleteClassBtn.classList.replace('text-red-600', 'text-white');
+                    
                     setTimeout(() => {
                         deleteConfirmMode = false;
-                        deleteClassBtn.innerText = "XÓA";
-                        deleteClassBtn.classList.remove('bg-red-500', 'text-white');
+                        deleteClassBtn.innerText = "XÓA LỚP";
+                        deleteClassBtn.classList.replace('bg-red-600', 'bg-red-100');
+                        deleteClassBtn.classList.replace('text-white', 'text-red-600');
                     }, 3000);
                 } else {
                     delete state.classLists[state.currentClass];
                     state.currentClass = Object.keys(state.classLists)[0];
                     state.names = [...(state.classLists[state.currentClass] || [])];
+                    
                     deleteConfirmMode = false;
-                    deleteClassBtn.innerText = "XÓA";
-                    deleteClassBtn.classList.remove('bg-red-500', 'text-white');
+                    deleteClassBtn.innerText = "XÓA LỚP";
+                    deleteClassBtn.classList.replace('bg-red-600', 'bg-red-100');
+                    deleteClassBtn.classList.replace('text-white', 'text-red-600');
+                    
                     updateClassSelectorUI();
                     resetGame();
-                    saveToLocal();
+                    saveToCloud(false);
+                    showStatus("Đã xóa lớp thành công", "#22c55e");
                 }
             });
 
@@ -406,7 +421,7 @@
                 state.classLists[state.currentClass] = newNames;
                 state.names = newNames;
                 resetGame();
-                showStatus("Đã cập nhật!", "#22c55e");
+                showStatus("Đã cập nhật danh sách học sinh", "#22c55e");
             });
 
             resetBtn.addEventListener('click', () => {
@@ -414,43 +429,17 @@
                 state.names = [];
                 resetGame();
                 manualInput.value = '';
-                showStatus("Đã xóa danh sách!", "#f97316");
+                showStatus("Đã xóa hết học sinh lớp này", "#f97316");
             });
 
-            saveLocalBtn.addEventListener('click', () => saveToLocal(true));
+            saveCloudBtn.addEventListener('click', () => saveToCloud(true));
 
-            // Xử lý file upload
-            fileInput.addEventListener('change', async (e) => {
-                const file = e.target.files[0]; if (!file) return;
-                try {
-                    let newNames = [];
-                    if (file.name.endsWith('.xlsx')) {
-                        const data = await file.arrayBuffer();
-                        const workbook = XLSX.read(data);
-                        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1});
-                        newNames = jsonData.flat().map(n => String(n).trim()).filter(n => n.length > 0);
-                    } else {
-                        const text = await file.text();
-                        newNames = text.split(/[\n,]+/).map(n => n.trim()).filter(n => n.length > 0);
-                    }
-                    if (newNames.length > 0) {
-                        state.classLists[state.currentClass] = newNames;
-                        state.names = newNames;
-                        resetGame();
-                        window.updateClassSelectorUI();
-                        showStatus("Đã tải từ file!", "#22c55e");
-                    }
-                } catch (err) { showStatus("Lỗi đọc file", "#ef4444"); }
-                e.target.value = '';
-            });
-
-            // Media inputs
             const bgmPlayer = document.getElementById('bgmPlayer');
             document.getElementById('bgmInput').addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (file) {
                     bgmPlayer.src = URL.createObjectURL(file);
-                    bgmPlayer.play().catch(e => console.log("Cần tương tác để phát nhạc"));
+                    bgmPlayer.play();
                 }
             });
             document.getElementById('bgInput').addEventListener('change', (e) => {
@@ -459,15 +448,6 @@
                     const img = new Image();
                     img.onload = () => { bgImage = img; };
                     img.src = URL.createObjectURL(file);
-                }
-            });
-
-            // Fullscreen
-            document.getElementById('fullscreen-btn').addEventListener('click', () => {
-                if (!document.fullscreenElement) {
-                    document.documentElement.requestFullscreen();
-                } else {
-                    if (document.exitFullscreen) document.exitFullscreen();
                 }
             });
 
@@ -480,42 +460,41 @@
             statusText.style.color = color;
         }
 
-        // --- LOCAL STORAGE LOGIC (Replacement for Cloud) ---
-        function saveToLocal(showNotif = true) {
+        // --- CLOUD STORAGE LOGIC ---
+        async function saveToCloud(showNotif = true) {
+            if (!state.user) return;
             try {
-                const data = {
+                const configDoc = doc(db, 'artifacts', appId, 'users', state.user.uid, 'settings', 'classConfig');
+                await setDoc(configDoc, {
                     classLists: state.classLists,
                     currentClass: state.currentClass,
                     updatedAt: Date.now()
-                };
-                localStorage.setItem('nongtraimayman_config', JSON.stringify(data));
-                if (showNotif) showStatus("Đã lưu vào Browser ✨", "#22c55e");
+                });
+                if (showNotif) showStatus("Đã lưu lên đám mây ✨", "#22c55e");
             } catch (error) {
                 console.error(error);
-                if (showNotif) showStatus("Lỗi lưu dữ liệu", "#ef4444");
+                if (showNotif) showStatus("Lỗi kết nối khi lưu", "#ef4444");
             }
         }
 
-        function loadFromLocal() {
+        async function loadFromCloud() {
+            if (!state.user) return;
             try {
-                const raw = localStorage.getItem('nongtraimayman_config');
-                if (raw) {
-                    const data = JSON.parse(raw);
-                    if (data.classLists) {
-                        state.classLists = data.classLists;
-                        state.currentClass = data.currentClass || Object.keys(data.classLists)[0];
-                        // Validate if currentClass exists
-                        if (!state.classLists[state.currentClass]) {
-                            state.currentClass = Object.keys(state.classLists)[0];
-                        }
-                        state.names = [...(state.classLists[state.currentClass] || [])];
-                        window.updateClassSelectorUI();
-                        resetGame();
-                        showStatus("Đã tải dữ liệu cũ", "#22c55e");
-                    }
+                const configDoc = doc(db, 'artifacts', appId, 'users', state.user.uid, 'settings', 'classConfig');
+                const snap = await getDoc(configDoc);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    state.classLists = data.classLists;
+                    state.currentClass = data.currentClass || Object.keys(data.classLists)[0];
+                    state.names = [...(state.classLists[state.currentClass] || [])];
+                    window.updateClassSelectorUI();
+                    resetGame();
+                    showStatus("Đã tải dữ liệu lớp học", "#22c55e");
+                } else {
+                    showStatus("Chào mừng bạn!", "#FFFFFF");
                 }
             } catch (error) {
-                console.error("Lỗi tải data local", error);
+                console.error(error);
             }
         }
 
@@ -533,13 +512,22 @@
             const menuBtn = document.getElementById('menu-btn');
             const uiPanel = document.getElementById('ui-panel');
             menuBtn.addEventListener('click', () => uiPanel.classList.toggle('panel-hidden'));
-            
-            // Auto load data local
-            loadFromLocal();
-            // Nếu không có data, dùng mặc định và update UI
-            if (state.names.length === 0) {
-                 state.names = [...(state.classLists[state.currentClass] || [])];
-                 window.updateClassSelectorUI();
+            document.addEventListener('click', (e) => {
+                if (!uiPanel.contains(e.target) && !menuBtn.contains(e.target)) uiPanel.classList.add('panel-hidden');
+            });
+
+            state.names = [...(state.classLists[state.currentClass] || [])];
+            window.updateClassSelectorUI();
+
+            onAuthStateChanged(auth, (user) => {
+                state.user = user;
+                if (user) loadFromCloud();
+            });
+
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
             }
 
             createAnimals();
@@ -554,7 +542,7 @@
             if(state.mode === 'IDLE') arrangeAnimalsGrid();
         }
 
-        // --- GAME LOGIC (GIỮ NGUYÊN) ---
+        // --- CLASS ANIMAL ---
         class Animal {
             constructor(name, index) {
                 this.name = name;
@@ -747,7 +735,7 @@
 
             if (gesture === 'OPEN_PALM' && state.mode !== 'SHUFFLING') {
                 state.mode = 'SHUFFLING';
-                showStatus("🌪️ Đang xoay...", "#FFD700");
+                showStatus("🌪️ Đang xoay vòng...", "#FFD700");
                 state.winners = []; state.animals.forEach(a => a.isWinner = false);
                 if(window.shuffleInterval) clearInterval(window.shuffleInterval);
                 window.shuffleInterval = setInterval(() => {
@@ -803,6 +791,30 @@
             createAnimals();
         }
 
+        async function handleFileUpload(e) {
+            const file = e.target.files[0]; if (!file) return;
+            try {
+                let newNames = [];
+                if (file.name.endsWith('.xlsx')) {
+                    const data = await file.arrayBuffer();
+                    const workbook = XLSX.read(data);
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1});
+                    newNames = jsonData.flat().map(n => String(n).trim()).filter(n => n.length > 0);
+                } else {
+                    const text = await file.text();
+                    newNames = text.split(/[\n,]+/).map(n => n.trim()).filter(n => n.length > 0);
+                }
+                if (newNames.length > 0) {
+                    state.classLists[state.currentClass] = newNames;
+                    state.names = newNames;
+                    resetGame();
+                    window.updateClassSelectorUI();
+                    showStatus("Đã tải học sinh từ file!", "#22c55e");
+                }
+            } catch (err) { showStatus("Lỗi khi đọc file", "#ef4444"); }
+            e.target.value = '';
+        }
+
         function drawBackground() {
             if (bgImage) {
                 const scale = Math.max(width / bgImage.width, height / bgImage.height);
@@ -853,27 +865,41 @@
                 
                 video = document.getElementById("camera-feed");
                 
+                // Thử khởi tạo camera với xử lý lỗi NotFoundError
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { width: 320, height: 240, facingMode: "user" } 
+                        video: { 
+                            width: 640, 
+                            height: 480,
+                            facingMode: "user" 
+                        } 
                     });
                     video.srcObject = stream;
                     state.cameraActive = true;
                     return new Promise(resolve => { video.onloadeddata = resolve; });
                 } catch (mediaError) {
-                    console.warn("Camera Error:", mediaError);
+                    console.warn("MediaDevice Error:", mediaError);
                     state.cameraActive = false;
-                    showStatus("Không có Camera! (Chế độ xem)", "#ef4444");
+                    
+                    if (mediaError.name === 'NotFoundError' || mediaError.name === 'DevicesNotFoundError') {
+                        showStatus("Không tìm thấy Camera! Hãy cắm webcam.", "#ef4444");
+                    } else if (mediaError.name === 'NotAllowedError' || mediaError.name === 'PermissionDeniedError') {
+                        showStatus("Vui lòng cho phép quyền truy cập Camera!", "#ef4444");
+                    } else {
+                        showStatus("Lỗi Camera: " + mediaError.message, "#ef4444");
+                    }
+                    // Trả về một promise giả để không chặn luồng khởi tạo ứng dụng
                     return Promise.resolve();
                 }
             } catch (err) {
-                console.error("AI Error:", err);
+                console.error("Vision Setup Error:", err);
                 showStatus("Lỗi khởi tạo AI!", "#ef4444");
                 return Promise.resolve();
             }
         }
 
         function processVision() {
+            // Chỉ xử lý nếu camera đang hoạt động và có dữ liệu
             if (state.cameraActive && handLandmarker && video.currentTime !== lastVideoTime && video.readyState >= 2) {
                 lastVideoTime = video.currentTime;
                 const result = handLandmarker.detectForVideo(video, Date.now());
