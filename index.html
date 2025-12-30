@@ -3,93 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Học sinh may mắn</title>
+    <title>Nông Trại May Mắn AR - Notion Ready</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MediaPipe - Hand Tracking -->
     <script async src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js"></script>
-    <!-- Thư viện xử lý File -->
+    <!-- Thư viện đọc File -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #87CEEB; }
         #game-canvas { display: block; width: 100vw; height: 100vh; touch-action: none; }
+        
         #camera-container {
             position: absolute; bottom: 20px; right: 20px; width: 180px; height: 135px;
             border-radius: 12px; overflow: hidden; border: 3px solid white;
             box-shadow: 0 8px 20px rgba(0,0,0,0.3); z-index: 20; background: black;
         }
         #camera-feed { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+
         #menu-btn {
             position: absolute; top: 20px; left: 20px; z-index: 40; background: white;
             border-radius: 50%; width: 48px; height: 48px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            display: flex; align-items: center; justify-content: center; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s;
         }
+        #menu-btn:hover { transform: scale(1.1); }
+
         #ui-panel {
             position: absolute; top: 80px; left: 20px; background: rgba(255, 255, 255, 0.98);
             padding: 20px; border-radius: 16px; width: 340px; z-index: 30;
             box-shadow: 0 10px 30px rgba(0,0,0,0.15); max-height: 80vh; overflow-y: auto;
-            transition: opacity 0.3s;
+            transition: opacity 0.3s, transform 0.3s; transform-origin: top left;
         }
-        .panel-hidden { opacity: 0; pointer-events: none; }
+        .panel-hidden { opacity: 0; transform: scale(0.9) translateY(-10px); pointer-events: none; }
+
         #loading { position: fixed; inset: 0; background: #f0f9ff; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
+        
+        /* Custom Scrollbar */
+        #ui-panel::-webkit-scrollbar { width: 6px; }
+        #ui-panel::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     </style>
 </head>
 <body>
 
+    <!-- Màn hình tải -->
     <div id="loading">
         <div class="text-6xl mb-4 animate-bounce">🚜</div>
-        <h1 class="text-2xl font-bold text-blue-700">Học Sinh May Mắn</h1>
-        <p id="loading-status" class="text-gray-500 mt-2">Đang thiết lập hệ thống...</p>
+        <h1 class="text-2xl font-bold text-blue-700">Nông Trại May Mắn</h1>
+        <p id="loading-status" class="text-gray-500 mt-2">Đang thiết lập nông trại...</p>
     </div>
 
-    <div id="menu-btn">⚙️</div>
+    <!-- Nút Menu -->
+    <div id="menu-btn" title="Cài đặt">⚙️</div>
 
+    <!-- Bảng điều khiển -->
     <div id="ui-panel" class="panel-hidden">
-        <h2 class="text-xl font-bold text-green-700 mb-4">🌻 Quản lý lớp học</h2>
+        <h2 class="text-xl font-bold text-green-700 mb-4 flex items-center gap-2">
+            <span>🌻</span> Cấu hình hệ thống
+        </h2>
+        
         <div class="space-y-4">
+            <!-- Quản lý lớp -->
             <div class="bg-blue-50 p-3 rounded-xl border border-blue-100">
-                <label class="block text-xs font-bold text-blue-800 mb-2 uppercase">Lớp hiện tại:</label>
+                <label class="block text-[10px] font-bold text-blue-800 mb-1 uppercase">Lớp đang dạy:</label>
+                <div class="flex gap-2 mb-2">
+                    <select id="classSelector" class="flex-1 p-2 rounded-lg border bg-white text-sm outline-none focus:ring-2 focus:ring-blue-400"></select>
+                    <button id="deleteClassBtn" class="bg-red-50 text-red-600 p-2 rounded-lg border border-red-200 hover:bg-red-100">🗑️</button>
+                </div>
                 <div class="flex gap-2">
-                    <select id="classSelector" class="flex-1 p-2 rounded-lg border bg-white text-sm outline-none"></select>
-                    <button id="deleteClassBtn" class="bg-red-50 text-red-600 p-2 rounded-lg border border-red-200">🗑️</button>
+                    <input type="text" id="newClassName" class="flex-1 p-2 border rounded-lg text-sm" placeholder="Tên lớp mới...">
+                    <button id="addClassBtn" class="bg-blue-600 text-white px-3 rounded-lg text-sm font-bold">Thêm</button>
                 </div>
             </div>
-            <div class="flex gap-2">
-                <input type="text" id="newClassName" class="flex-1 p-2 border rounded-lg text-sm" placeholder="Tên lớp mới...">
-                <button id="addClassBtn" class="bg-green-600 text-white px-4 rounded-lg text-sm font-bold">Thêm</button>
-            </div>
-            <hr>
+
+            <!-- Tùy chỉnh Giao diện & Âm thanh -->
             <div class="grid grid-cols-2 gap-2">
-                <label class="cursor-pointer bg-blue-100 text-blue-700 p-2 rounded-lg text-xs text-center font-bold">
-                    📂 Tải File
-                    <input type="file" id="fileInput" accept=".txt,.xlsx,.xls,.docx" class="hidden">
+                <label class="cursor-pointer bg-purple-100 hover:bg-purple-200 text-purple-700 p-2 rounded-lg text-xs text-center font-bold border border-purple-200 flex flex-col items-center gap-1">
+                    <span>🎵 Nhạc nền</span>
+                    <input type="file" id="bgmInput" accept="audio/*" class="hidden">
                 </label>
-                <button id="resetNamesBtn" class="bg-gray-100 text-gray-700 p-2 rounded-lg text-xs font-bold">🔄 Xóa tên</button>
+                <label class="cursor-pointer bg-teal-100 hover:bg-teal-200 text-teal-700 p-2 rounded-lg text-xs text-center font-bold border border-teal-200 flex flex-col items-center gap-1">
+                    <span>🖼️ Ảnh nền</span>
+                    <input type="file" id="bgInput" accept="image/*" class="hidden">
+                </label>
             </div>
+            <audio id="bgmPlayer" loop></audio>
+
+            <!-- Nhập dữ liệu -->
             <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
-                <label class="block text-xs font-bold text-gray-600 mb-1">Dòng học sinh:</label>
-                <textarea id="manualInput" rows="4" class="w-full p-2 text-sm rounded-lg border mb-2 outline-none"></textarea>
-                <button id="manualBtn" class="w-full bg-green-600 text-white py-2 rounded-lg text-sm font-bold">✅ Cập nhật</button>
+                <div class="flex justify-between items-center mb-2">
+                    <label class="text-[10px] font-bold text-gray-600 uppercase">Danh sách học sinh:</label>
+                    <label class="cursor-pointer text-blue-600 text-[10px] font-bold underline">
+                        Tải Excel/Word
+                        <input type="file" id="fileInput" accept=".txt,.xlsx,.xls,.docx" class="hidden">
+                    </label>
+                </div>
+                <textarea id="manualInput" rows="4" class="w-full p-2 text-sm rounded-lg border mb-2 outline-none focus:ring-2 focus:ring-green-400" placeholder="Nguyễn Văn A..."></textarea>
+                <button id="manualBtn" class="w-full bg-green-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-green-700 shadow-sm">✅ Cập nhật tên</button>
             </div>
-            <button id="saveCloudBtn" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold shadow-lg">☁️ LƯU ĐÁM MÂY</button>
-            <p id="auth-status" class="text-[10px] text-center text-gray-400">Chưa kết nối Cloud</p>
+
+            <!-- Đồng bộ -->
+            <button id="saveCloudBtn" class="w-full bg-orange-500 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-orange-600 flex items-center justify-center gap-2">
+                ☁️ LƯU LÊN ĐÁM MÂY
+            </button>
+            <p id="auth-status" class="text-[10px] text-center text-gray-400 italic">Chế độ Offline</p>
         </div>
     </div>
 
+    <!-- Thông báo trạng thái -->
     <div id="status-container" class="absolute top-10 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
-        <div id="status-text" class="text-3xl font-black text-white px-8 py-3 rounded-full bg-black/40 backdrop-blur-lg border border-white/20 shadow-2xl">
-            Sẵn sàng!
+        <div id="status-text" class="text-2xl font-black text-white px-8 py-3 rounded-full bg-black/40 backdrop-blur-lg border border-white/20 shadow-2xl transition-all">
+            Đang khởi tạo...
         </div>
     </div>
 
+    <!-- Camera -->
     <div id="camera-container">
         <video id="camera-feed" autoplay playsinline muted></video>
     </div>
 
     <canvas id="game-canvas"></canvas>
 
+    <!-- Firebase Imports -->
     <script type="importmap">
     {
       "imports": {
@@ -106,52 +142,53 @@
         import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
         import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
 
-        /* HƯỚNG DẪN: 
-           Nếu bạn nhúng vào Notion, hãy thay thế 'null' ở dưới bằng config của bạn 
-           từ Firebase Console (Settings -> Your Apps -> Web App).
-        */
+        // --- HÀM HỖ TRỢ VẼ (RẤT QUAN TRỌNG) ---
+        function drawCircle(ctx, x, y, r, color, strokeColor = null) {
+            ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fillStyle = color; ctx.fill();
+            if (strokeColor) { ctx.strokeStyle = strokeColor; ctx.lineWidth = 2; ctx.stroke(); }
+        }
+        function drawOval(ctx, x, y, w, h, color) {
+            ctx.beginPath(); ctx.ellipse(x, y, w, h, 0, 0, Math.PI * 2);
+            ctx.fillStyle = color; ctx.fill();
+        }
+
+        // --- CẤU HÌNH FIREBASE CỦA BẠN (HÃY THAY THẾ Ở ĐÂY) ---
         const myFirebaseConfig = {
-            apiKey: "AIza...", 
-            authDomain: "your-app.firebaseapp.com",
-            projectId: "your-app",
-            storageBucket: "your-app.appspot.com",
-            messagingSenderId: "...",
-            appId: "..."
+            apiKey: "", 
+            authDomain: "",
+            projectId: "",
+            storageBucket: "",
+            messagingSenderId: "",
+            appId: ""
         };
 
-        // --- KHỞI TẠO FIREBASE ---
         let db, auth, user = null;
-        let finalAppId = "notion-app";
+        let finalAppId = typeof __app_id !== 'undefined' ? __app_id : 'nong-trai-notion';
 
         try {
-            // Ưu tiên dùng config cá nhân nếu có, không thì dùng config hệ thống
-            const config = myFirebaseConfig.apiKey !== "AIza..." ? myFirebaseConfig : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
-            finalAppId = typeof __app_id !== 'undefined' ? __app_id : 'notion-user-app';
-            
+            const config = myFirebaseConfig.apiKey ? myFirebaseConfig : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
             if (config) {
                 const app = initializeApp(config);
                 auth = getAuth(app);
                 db = getFirestore(app);
             }
-        } catch (e) { console.warn("Firebase Init Fail:", e); }
+        } catch (e) { console.warn("Firebase Init Error", e); }
 
         // --- TRẠNG THÁI ---
         const ANIMAL_TYPES = ['pig', 'chicken', 'frog', 'bear', 'cat', 'panda'];
         const state = {
-            classLists: { "Lớp 1": ["Học sinh 1", "Học sinh 2"] },
-            currentClass: "Lớp 1",
-            names: [],
+            classLists: { "Lớp Mẫu": ["Học sinh A", "Học sinh B", "Học sinh C"] },
+            currentClass: "Lớp Mẫu",
             animals: [],
             mode: 'IDLE',
+            cooldown: 0,
             cameraActive: false
         };
 
-        let canvas, ctx, width, height, handLandmarker, video;
+        let canvas, ctx, width, height, handLandmarker, video, bgImage = null, particles = [];
 
-        // --- VẼ HÌNH ---
-        function drawCircle(ctx, x, y, r, color) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); }
-        function drawOval(ctx, x, y, w, h, color) { ctx.beginPath(); ctx.ellipse(x, y, w, h, 0, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); }
-
+        // --- CLASS ANIMAL ---
         class Animal {
             constructor(name, index) {
                 this.name = name;
@@ -159,27 +196,36 @@
                 this.x = Math.random() * window.innerWidth;
                 this.y = Math.random() * window.innerHeight;
                 this.targetX = this.x; this.targetY = this.y;
-                this.size = 50; this.targetSize = 50;
+                this.size = 40; this.targetSize = 40;
+                this.angle = 0;
             }
             update() {
                 this.x += (this.targetX - this.x) * 0.1;
                 this.y += (this.targetY - this.y) * 0.1;
                 this.size += (this.targetSize - this.size) * 0.1;
+                if(state.mode === 'SHUFFLING') this.angle = Math.sin(Date.now()/50) * 0.2;
+                else this.angle = 0;
             }
             draw(ctx) {
-                ctx.save(); ctx.translate(this.x, this.y);
-                drawCircle(ctx, 0, 0, this.size*0.8, '#FFF'); // Simplified
-                ctx.fillStyle = '#5D4037'; ctx.fillRect(-40, 40, 80, 25);
-                ctx.fillStyle = '#FFF'; ctx.font = "bold 12px Arial"; ctx.textAlign="center";
-                ctx.fillText(this.name, 0, 58);
+                ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+                // Vẽ bóng
+                ctx.fillStyle = 'rgba(0,0,0,0.1)'; drawOval(ctx, 0, this.size, this.size, this.size/4, 'rgba(0,0,0,0.1)');
+                // Vẽ thân
+                drawCircle(ctx, 0, 0, this.size, this.getColor());
+                // Vẽ tên
+                ctx.fillStyle = '#5D4037'; ctx.beginPath(); ctx.roundRect(-40, this.size+5, 80, 20, 5); ctx.fill();
+                ctx.fillStyle = '#FFF'; ctx.font = "bold 11px Arial"; ctx.textAlign="center"; ctx.fillText(this.name, 0, this.size+19);
                 ctx.restore();
+            }
+            getColor() {
+                const colors = { pig: '#F06292', chicken: '#FFF', frog: '#66BB6A', bear: '#795548', cat: '#FFA726', panda: '#FAFAFA' };
+                return colors[this.type];
             }
         }
 
-        // --- LOGIC ---
+        // --- GIAO DIỆN ---
         function updateUI() {
             const sel = document.getElementById('classSelector');
-            if(!sel) return;
             sel.innerHTML = '';
             Object.keys(state.classLists).forEach(c => {
                 const opt = document.createElement('option');
@@ -188,38 +234,116 @@
                 sel.appendChild(opt);
             });
             document.getElementById('manualInput').value = state.classLists[state.currentClass].join('\n');
+            showStatus("Đã chuyển sang: " + state.currentClass);
+        }
+
+        function initHandlers() {
+            document.getElementById('menu-btn').onclick = () => document.getElementById('ui-panel').classList.toggle('panel-hidden');
+            
+            document.getElementById('classSelector').onchange = (e) => {
+                state.currentClass = e.target.value;
+                resetGame();
+                updateUI();
+            };
+
+            document.getElementById('addClassBtn').onclick = () => {
+                const name = document.getElementById('newClassName').value.trim();
+                if(name) { state.classLists[name] = []; state.currentClass = name; updateUI(); resetGame(); }
+            };
+
+            document.getElementById('deleteClassBtn').onclick = () => {
+                if(Object.keys(state.classLists).length <= 1) return;
+                delete state.classLists[state.currentClass];
+                state.currentClass = Object.keys(state.classLists)[0];
+                updateUI(); resetGame();
+            };
+
+            document.getElementById('manualBtn').onclick = () => {
+                const names = document.getElementById('manualInput').value.split('\n').filter(n => n.trim());
+                state.classLists[state.currentClass] = names;
+                resetGame();
+            };
+
+            // TÍNH NĂNG ÂM THANH & NỀN
+            document.getElementById('bgmInput').onchange = (e) => {
+                const file = e.target.files[0];
+                if(file) {
+                    const player = document.getElementById('bgmPlayer');
+                    player.src = URL.createObjectURL(file);
+                    player.play().catch(() => showStatus("Nhấn vào màn hình để phát nhạc"));
+                }
+            };
+
+            document.getElementById('bgInput').onchange = (e) => {
+                const file = e.target.files[0];
+                if(file) {
+                    const img = new Image();
+                    img.onload = () => { bgImage = img; };
+                    img.src = URL.createObjectURL(file);
+                }
+            };
+
+            document.getElementById('saveCloudBtn').onclick = () => saveToCloud(true);
         }
 
         async function saveToCloud(notify) {
-            if (!user || !db) { alert("Bạn cần cấu hình Firebase API Key trong mã nguồn để dùng tính năng này!"); return; }
-            try {
-                const docRef = doc(db, 'artifacts', finalAppId, 'users', user.uid, 'settings', 'classConfig');
-                await setDoc(docRef, { classLists: state.classLists, currentClass: state.currentClass });
-                if (notify) alert("Đã lưu!");
-            } catch (e) { console.error(e); }
+            if(!user || !db) return alert("Chưa cấu hình Firebase!");
+            const ref = doc(db, 'artifacts', finalAppId, 'users', user.uid, 'settings', 'classConfig');
+            await setDoc(ref, { classLists: state.classLists, currentClass: state.currentClass });
+            if(notify) showStatus("Đã lưu lên Cloud! ✨", "#22c55e");
         }
 
         async function loadFromCloud() {
-            if (!user || !db) return;
-            const docRef = doc(db, 'artifacts', finalAppId, 'users', user.uid, 'settings', 'classConfig');
-            const snap = await getDoc(docRef);
-            if (snap.exists()) {
+            if(!user || !db) return;
+            const ref = doc(db, 'artifacts', finalAppId, 'users', user.uid, 'settings', 'classConfig');
+            const snap = await getDoc(ref);
+            if(snap.exists()) {
                 const data = snap.data();
                 state.classLists = data.classLists;
                 state.currentClass = data.currentClass;
-                state.names = [...state.classLists[state.currentClass]];
-                updateUI();
-                resetGame();
+                updateUI(); resetGame();
+                showStatus("Đã tải dữ liệu cũ", "#22c55e");
             }
         }
 
+        function showStatus(msg, color="#FFF") {
+            const el = document.getElementById('status-text');
+            el.innerText = msg; el.style.color = color;
+        }
+
+        // --- GAME LOGIC ---
         function resetGame() {
+            state.mode = 'IDLE';
             state.animals = state.classLists[state.currentClass].map((n, i) => new Animal(n, i));
             const count = state.animals.length;
-            const cols = Math.ceil(Math.sqrt(count));
+            if(count === 0) return;
+            const cols = Math.ceil(Math.sqrt(count * (width/height)));
+            const rows = Math.ceil(count / cols);
+            const cellW = (width * 0.8) / cols, cellH = (height * 0.7) / rows;
             state.animals.forEach((a, i) => {
-                a.targetX = (i % cols + 0.5) * (width / cols);
-                a.targetY = (Math.floor(i / cols) + 0.5) * (height / Math.ceil(count/cols));
+                a.targetX = (i % cols + 0.5) * cellW + (width * 0.1);
+                a.targetY = (Math.floor(i / cols) + 0.5) * cellH + (height * 0.15);
+                a.targetSize = Math.min(cellW, cellH) * 0.35;
+            });
+        }
+
+        function pickWinners(count) {
+            if(state.animals.length === 0) return;
+            state.mode = 'WINNER';
+            let pool = state.animals.map((_, i) => i);
+            let winners = [];
+            for(let i=0; i<count && pool.length>0; i++) winners.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
+            
+            state.animals.forEach((a, i) => {
+                if(winners.includes(i)) {
+                    const idx = winners.indexOf(i);
+                    a.targetX = width/2; a.targetY = height/2 + (idx - (winners.length-1)/2) * 120;
+                    a.targetSize = 80;
+                } else {
+                    const angle = Math.random() * Math.PI * 2;
+                    a.targetX = width/2 + Math.cos(angle) * width;
+                    a.targetY = height/2 + Math.sin(angle) * height;
+                }
             });
         }
 
@@ -231,48 +355,70 @@
                     runningMode: "VIDEO", numHands: 1
                 });
                 video = document.getElementById("camera-feed");
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 } });
                 video.srcObject = stream;
                 state.cameraActive = true;
-            } catch (e) { document.getElementById('status-text').innerText = "Không có Camera!"; }
+                return new Promise(r => video.onloadeddata = r);
+            } catch (e) { showStatus("Không tìm thấy Camera!", "#ef4444"); }
         }
 
         function gameLoop() {
             ctx.clearRect(0,0,width,height);
-            ctx.fillStyle = "#87CEEB"; ctx.fillRect(0,0,width,height);
+            // Background
+            if(bgImage) {
+                const s = Math.max(width/bgImage.width, height/bgImage.height);
+                ctx.drawImage(bgImage, (width-bgImage.width*s)/2, (height-bgImage.height*s)/2, bgImage.width*s, bgImage.height*s);
+            } else {
+                const g = ctx.createLinearGradient(0,0,0,height); g.addColorStop(0, '#4FC3F7'); g.addColorStop(1, '#81C784');
+                ctx.fillStyle = g; ctx.fillRect(0,0,width,height);
+            }
+
             state.animals.forEach(a => { a.update(); a.draw(ctx); });
+
+            // AI Logic
+            if(state.cameraActive && handLandmarker && video.currentTime !== lastVideoTime) {
+                lastVideoTime = video.currentTime;
+                const res = handLandmarker.detectForVideo(video, Date.now());
+                if(res.landmarks.length > 0) {
+                    const lm = res.landmarks[0];
+                    const isUp = (t, p) => lm[t].y < lm[p].y;
+                    const c = [8,12,16,20].filter(idx => isUp(idx, idx-2)).length;
+                    if(c >= 4 && state.mode !== 'SHUFFLING') {
+                        state.mode = 'SHUFFLING'; showStatus("🌪️ Đang xoay vòng...", "#FFD700");
+                        if(window.si) clearInterval(window.si);
+                        window.si = setInterval(() => {
+                            if(state.mode !== 'SHUFFLING') return clearInterval(window.si);
+                            state.animals.forEach(a => { a.targetX = Math.random()*width; a.targetY = Math.random()*height; });
+                        }, 300);
+                    } else if(c > 0 && c <= 3 && state.mode === 'SHUFFLING') {
+                        pickWinners(c); showStatus(`🎉 Đã chọn ${c} bạn!`, "#22c55e");
+                    }
+                }
+            }
             requestAnimationFrame(gameLoop);
         }
 
         window.onload = async () => {
-            canvas = document.getElementById('game-canvas');
-            ctx = canvas.getContext('2d');
-            width = canvas.width = window.innerWidth;
-            height = canvas.height = window.innerHeight;
-
-            document.getElementById('menu-btn').onclick = () => document.getElementById('ui-panel').classList.toggle('panel-hidden');
-            document.getElementById('saveCloudBtn').onclick = () => saveToCloud(true);
-            document.getElementById('manualBtn').onclick = () => {
-                const lines = document.getElementById('manualInput').value.split('\n').filter(l => l.trim());
-                state.classLists[state.currentClass] = lines;
-                resetGame();
-            };
-
-            if (auth) {
-                onAuthStateChanged(auth, u => {
-                    user = u;
-                    document.getElementById('auth-status').innerText = u ? "Đã kết nối Cloud (" + u.uid.substring(0,6) + ")" : "Lỗi kết nối";
-                    if(u) loadFromCloud();
+            canvas = document.getElementById('game-canvas'); ctx = canvas.getContext('2d');
+            width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight;
+            
+            initHandlers();
+            if(auth) {
+                onAuthStateChanged(auth, u => { 
+                    user = u; 
+                    document.getElementById('auth-status').innerText = u ? "Cloud Active (" + u.uid.substring(0,4) + ")" : "Offline Mode";
+                    if(u) loadFromCloud(); 
                 });
                 signInAnonymously(auth);
             }
 
-            updateUI();
-            resetGame();
+            updateUI(); resetGame();
             await setupVision();
             document.getElementById('loading').style.display = 'none';
             gameLoop();
         };
+        
+        window.onresize = () => { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; resetGame(); };
     </script>
 </body>
 </html>
