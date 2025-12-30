@@ -297,7 +297,8 @@
             mode: 'IDLE',
             winners: [],
             cooldown: 0,
-            user: null
+            user: null,
+            cameraActive: false // Thêm trạng thái camera
         };
 
         let handLandmarker;
@@ -378,7 +379,6 @@
                 }
             });
 
-            // LOGIC XÓA LỚP - Nhấn 1 lần để hỏi, nhấn lần 2 để xóa
             let deleteConfirmMode = false;
             deleteClassBtn.addEventListener('click', () => {
                 const keys = Object.keys(state.classLists);
@@ -393,7 +393,6 @@
                     deleteClassBtn.classList.replace('bg-red-100', 'bg-red-600');
                     deleteClassBtn.classList.replace('text-red-600', 'text-white');
                     
-                    // Reset sau 3 giây nếu không nhấn xác nhận
                     setTimeout(() => {
                         deleteConfirmMode = false;
                         deleteClassBtn.innerText = "XÓA LỚP";
@@ -401,7 +400,6 @@
                         deleteClassBtn.classList.replace('text-white', 'text-red-600');
                     }, 3000);
                 } else {
-                    // Thực hiện xóa thực sự
                     delete state.classLists[state.currentClass];
                     state.currentClass = Object.keys(state.classLists)[0];
                     state.names = [...(state.classLists[state.currentClass] || [])];
@@ -436,7 +434,6 @@
 
             saveCloudBtn.addEventListener('click', () => saveToCloud(true));
 
-            // BGM & BG
             const bgmPlayer = document.getElementById('bgmPlayer');
             document.getElementById('bgmInput').addEventListener('change', (e) => {
                 const file = e.target.files[0];
@@ -857,20 +854,53 @@
             requestAnimationFrame(gameLoop);
         }
 
+        // --- CÀI ĐẶT CAMERA & MEDIA PIPE ---
         async function setupVision() {
-            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
-            handLandmarker = await HandLandmarker.createFromOptions(vision, {
-                baseOptions: { modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`, delegate: "GPU" },
-                runningMode: "VIDEO", numHands: 1
-            });
-            video = document.getElementById("camera-feed");
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            video.srcObject = stream;
-            return new Promise(resolve => { video.onloadeddata = resolve; });
+            try {
+                const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+                handLandmarker = await HandLandmarker.createFromOptions(vision, {
+                    baseOptions: { modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`, delegate: "GPU" },
+                    runningMode: "VIDEO", numHands: 1
+                });
+                
+                video = document.getElementById("camera-feed");
+                
+                // Thử khởi tạo camera với xử lý lỗi NotFoundError
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            width: 640, 
+                            height: 480,
+                            facingMode: "user" 
+                        } 
+                    });
+                    video.srcObject = stream;
+                    state.cameraActive = true;
+                    return new Promise(resolve => { video.onloadeddata = resolve; });
+                } catch (mediaError) {
+                    console.warn("MediaDevice Error:", mediaError);
+                    state.cameraActive = false;
+                    
+                    if (mediaError.name === 'NotFoundError' || mediaError.name === 'DevicesNotFoundError') {
+                        showStatus("Không tìm thấy Camera! Hãy cắm webcam.", "#ef4444");
+                    } else if (mediaError.name === 'NotAllowedError' || mediaError.name === 'PermissionDeniedError') {
+                        showStatus("Vui lòng cho phép quyền truy cập Camera!", "#ef4444");
+                    } else {
+                        showStatus("Lỗi Camera: " + mediaError.message, "#ef4444");
+                    }
+                    // Trả về một promise giả để không chặn luồng khởi tạo ứng dụng
+                    return Promise.resolve();
+                }
+            } catch (err) {
+                console.error("Vision Setup Error:", err);
+                showStatus("Lỗi khởi tạo AI!", "#ef4444");
+                return Promise.resolve();
+            }
         }
 
         function processVision() {
-            if (handLandmarker && video.currentTime !== lastVideoTime) {
+            // Chỉ xử lý nếu camera đang hoạt động và có dữ liệu
+            if (state.cameraActive && handLandmarker && video.currentTime !== lastVideoTime && video.readyState >= 2) {
                 lastVideoTime = video.currentTime;
                 const result = handLandmarker.detectForVideo(video, Date.now());
                 if (result.landmarks.length > 0) handleLogic(detectGesture(result.landmarks[0]));
