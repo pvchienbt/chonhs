@@ -3,417 +3,894 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chọn Học Sinh - Notion V1.4</title>
+    <title>Học sinh may mắn - Notion Version</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- MediaPipe - Hand Tracking -->
+    <!-- MediaPipe -->
     <script async src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js"></script>
-    <!-- Thư viện đọc File -->
+    <!-- Thư viện đọc Excel (SheetJS) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #87CEEB; }
-        #game-canvas { display: block; width: 100vw; height: 100vh; touch-action: none; }
         
+        /* Layout chính */
+        #game-canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            touch-action: none;
+        }
+
+        /* Camera PIP */
         #camera-container {
-            position: absolute; bottom: 20px; right: 20px; width: 180px; height: 135px;
-            border-radius: 12px; overflow: hidden; border: 3px solid white;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.3); z-index: 20; background: black;
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 160px; /* Nhỏ hơn chút cho Notion */
+            height: 120px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 3px solid white;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            z-index: 20;
+            background: black;
+            transition: opacity 0.3s;
         }
-        #camera-feed { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        #camera-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Gương */
+        }
+        .cam-label {
+            position: absolute;
+            bottom: 3px;
+            right: 3px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            font-size: 9px;
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
 
+        /* Nút Menu Cài Đặt */
         #menu-btn {
-            position: absolute; top: 20px; left: 20px; z-index: 40; background: white;
-            border-radius: 50%; width: 48px; height: 48px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s;
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 40;
+            background: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        #menu-btn:hover { transform: scale(1.1); }
+        #menu-btn:hover {
+            transform: scale(1.1);
+            background: #f0f9ff;
+        }
 
+        /* UI Panel (Settings) */
         #ui-panel {
-            position: absolute; top: 80px; left: 20px; background: rgba(255, 255, 255, 0.98);
-            padding: 20px; border-radius: 16px; width: 340px; z-index: 30;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15); max-height: 80vh; overflow-y: auto;
-            transition: opacity 0.3s, transform 0.3s; transform-origin: top left;
+            position: absolute;
+            top: 65px;
+            left: 15px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 300px; /* Gọn hơn cho embed */
+            z-index: 30;
+            backdrop-filter: blur(5px);
+            border: 2px solid #e2e8f0;
+            transition: opacity 0.3s, transform 0.3s;
+            transform-origin: top left;
+            max-height: 80vh; 
+            overflow-y: auto; 
         }
-        .panel-hidden { opacity: 0; transform: scale(0.9) translateY(-10px); pointer-events: none; }
-
-        #loading { position: fixed; inset: 0; background: #f0f9ff; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
         
-        #ui-panel::-webkit-scrollbar { width: 6px; }
-        #ui-panel::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .panel-hidden {
+            opacity: 0;
+            transform: scale(0.9) translateY(-10px);
+            pointer-events: none;
+        }
+
+        /* Loading */
+        #loading {
+            position: fixed;
+            inset: 0;
+            background: #e0f2fe;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: opacity 0.5s;
+        }
+
+        /* Scrollbar styling */
+        #ui-panel::-webkit-scrollbar { width: 4px; }
+        #ui-panel::-webkit-scrollbar-track { background: transparent; }
+        #ui-panel::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+
+        /* Nút Fullscreen */
+        #fullscreen-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 40;
+            background: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
 </head>
 <body>
 
+    <!-- Loading Screen -->
     <div id="loading">
-        <div class="text-6xl mb-4 animate-bounce">🚜</div>
-        <h1 class="text-2xl font-bold text-blue-700">Học Sinh May Mắn</h1>
-        <p id="loading-status" class="text-gray-500 mt-2">Đang thiết lập AI cử chỉ...</p>
+        <div class="text-5xl mb-4 animate-bounce">🎨</div>
+        <h1 class="text-xl font-bold text-blue-600 mb-2">Nông Trại May Mắn</h1>
+        <p id="loading-status" class="text-sm text-gray-600">Đang khởi tạo...</p>
     </div>
 
-    <div id="menu-btn" title="Cài đặt">⚙️</div>
+    <!-- Nút Mở Menu -->
+    <button id="menu-btn" title="Cài đặt">⚙️</button>
+    
+    <!-- Nút Fullscreen (Hữu ích khi embed nhỏ) -->
+    <button id="fullscreen-btn" title="Toàn màn hình">⛶</button>
 
+    <!-- UI Panel (Cài đặt) -->
     <div id="ui-panel" class="panel-hidden">
-        <h2 class="text-xl font-bold text-green-700 mb-4 flex items-center gap-2">
-            <span>🌻</span> Cấu hình hệ thống
-        </h2>
+        <h1 class="text-lg font-bold text-green-700 flex items-center gap-2 mb-3">
+            <span>🌻</span> Quản lý lớp học
+        </h1>
         
-        <div class="space-y-4">
-            <div class="bg-blue-50 p-3 rounded-xl border border-blue-100">
-                <label class="block text-[10px] font-bold text-blue-800 mb-1 uppercase">Lớp đang dạy:</label>
+        <div class="space-y-3">
+            <!-- Khu vực CHỌN LỚP -->
+            <div class="bg-green-50 p-2 rounded-lg border border-green-100">
+                <label class="block text-[10px] font-bold text-green-800 mb-1">🏫 CHỌN LỚP:</label>
                 <div class="flex gap-2 mb-2">
-                    <select id="classSelector" class="flex-1 p-2 rounded-lg border bg-white text-sm outline-none focus:ring-2 focus:ring-blue-400"></select>
-                    <button id="deleteClassBtn" class="bg-red-50 text-red-600 p-2 rounded-lg border border-red-200 hover:bg-red-100">🗑️</button>
+                    <select id="classSelector" class="flex-1 p-1 text-sm rounded border border-gray-300 focus:outline-none focus:border-green-500">
+                        <option value="Lớp mặc định">Lớp mặc định</option>
+                    </select>
+                    <button id="deleteClassBtn" class="bg-red-100 hover:bg-red-200 text-red-600 p-1 px-2 rounded border border-red-200 text-[10px] font-bold">XÓA</button>
                 </div>
+                
                 <div class="flex gap-2">
-                    <input type="text" id="newClassName" class="flex-1 p-2 border rounded-lg text-sm" placeholder="Tên lớp mới...">
-                    <button id="addClassBtn" class="bg-blue-600 text-white px-3 rounded-lg text-sm font-bold">Thêm</button>
+                    <input type="text" id="newClassName" class="flex-1 p-1 text-sm rounded border border-gray-300 focus:outline-none focus:border-green-500" placeholder="Thêm lớp mới...">
+                    <button id="addClassBtn" class="bg-green-600 hover:bg-green-700 text-white px-2 rounded text-sm font-bold">+</button>
                 </div>
             </div>
 
+            <hr class="border-gray-200">
+
+            <!-- Khu vực: Nhập từ File -->
+            <div class="flex gap-2">
+                <label class="flex-1 cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-2 py-2 rounded-lg text-xs text-center font-medium transition shadow-sm flex flex-col justify-center items-center">
+                    <span>📂 Excel/Txt</span>
+                    <input type="file" id="fileInput" accept=".txt,.csv,.xlsx,.xls" class="hidden">
+                </label>
+                <button id="resetBtn" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg text-xs font-medium transition shadow-sm" title="Xóa danh sách hiện tại">
+                    🔄 Reset
+                </button>
+            </div>
+
+            <!-- Khu vực: Nhạc & Nền -->
             <div class="grid grid-cols-2 gap-2">
-                <label class="cursor-pointer bg-purple-100 hover:bg-purple-200 text-purple-700 p-2 rounded-lg text-xs text-center font-bold border border-purple-200 flex flex-col items-center gap-1">
-                    <span>🎵 Nhạc nền</span>
+                <label class="cursor-pointer bg-purple-500 hover:bg-purple-600 text-white px-2 py-2 rounded-lg text-xs text-center font-medium transition shadow-sm flex items-center justify-center gap-1">
+                    <span>🎵 Nhạc</span>
                     <input type="file" id="bgmInput" accept="audio/*" class="hidden">
                 </label>
-                <label class="cursor-pointer bg-teal-100 hover:bg-teal-200 text-teal-700 p-2 rounded-lg text-xs text-center font-bold border border-teal-200 flex flex-col items-center gap-1">
-                    <span>🖼️ Ảnh nền</span>
+                <label class="cursor-pointer bg-teal-500 hover:bg-teal-600 text-white px-2 py-2 rounded-lg text-xs text-center font-medium transition shadow-sm flex items-center justify-center gap-1">
+                    <span>🖼️ Nền</span>
                     <input type="file" id="bgInput" accept="image/*" class="hidden">
                 </label>
             </div>
-            <audio id="bgmPlayer" loop></audio>
+            <audio id="bgmPlayer" loop class="hidden"></audio>
 
-            <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
-                <div class="flex justify-between items-center mb-2">
-                    <label class="text-[10px] font-bold text-gray-600 uppercase">Danh sách học sinh:</label>
-                    <label class="cursor-pointer text-blue-600 text-[10px] font-bold underline">
-                        Tải Excel/Word
-                        <input type="file" id="fileInput" accept=".txt,.xlsx,.xls,.docx" class="hidden">
-                    </label>
+            <hr class="border-gray-200">
+
+            <!-- Khu vực: Nhập Thủ Công -->
+            <div class="bg-blue-50 p-2 rounded-lg border border-blue-100">
+                <label class="block text-[10px] font-bold text-blue-800 mb-1">📝 DANH SÁCH:</label>
+                <textarea id="manualInput" rows="4" class="w-full p-2 text-xs rounded border border-gray-300 focus:outline-none focus:border-blue-500 mb-2" placeholder="Nhập tên, mỗi tên 1 dòng..."></textarea>
+                <div class="flex flex-col gap-2">
+                    <button id="manualBtn" class="w-full bg-green-600 hover:bg-green-700 text-white py-1.5 rounded text-xs font-bold transition shadow-sm">
+                        ✅ Cập nhật
+                    </button>
+                    <button id="saveLocalBtn" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-1.5 rounded text-xs font-bold transition shadow-sm">
+                        💾 Lưu cài đặt (Browser)
+                    </button>
                 </div>
-                <textarea id="manualInput" rows="4" class="w-full p-2 text-sm rounded-lg border mb-2 outline-none focus:ring-2 focus:ring-green-400" placeholder="Nguyễn Văn A..."></textarea>
-                <button id="manualBtn" class="w-full bg-green-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-green-700 shadow-sm">✅ Cập nhật tên</button>
             </div>
-
-            <button id="saveCloudBtn" class="w-full bg-orange-500 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-orange-600 flex items-center justify-center gap-2">
-                ☁️ LƯU LÊN ĐÁM MÂY
-            </button>
-            <p id="auth-status" class="text-[10px] text-center text-gray-400 italic">Chế độ Offline</p>
+            
+            <p class="text-[9px] text-gray-400 text-center italic mt-1">Dữ liệu được lưu trên trình duyệt này.</p>
         </div>
     </div>
 
-    <div id="status-container" class="absolute top-10 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
-        <div id="status-text" class="text-2xl font-black text-white px-8 py-3 rounded-full bg-black/40 backdrop-blur-lg border border-white/20 shadow-2xl transition-all">
-            Đang khởi tạo...
+    <!-- Trạng thái nổi bật -->
+    <div id="status-container" class="absolute top-5 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none w-full text-center px-4">
+        <div id="status-text" class="inline-block text-xl font-black text-white px-6 py-2 rounded-full bg-black/40 backdrop-blur-md shadow-lg border border-white/20 transition-all whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
+            Đang tải dữ liệu...
         </div>
     </div>
 
+    <!-- BẢN QUYỀN -->
+    <div class="fixed bottom-2 left-4 pointer-events-none z-50">
+        <div class="text-white/40 font-bold text-xs font-mono select-none drop-shadow-md">
+            @NhomCaCon (Notion Edt.)
+        </div>
+    </div>
+
+    <!-- Camera PIP -->
     <div id="camera-container">
         <video id="camera-feed" autoplay playsinline muted></video>
+        <div class="cam-label">AI Cam</div>
     </div>
 
+    <!-- Game Canvas -->
     <canvas id="game-canvas"></canvas>
-
-    <script type="importmap">
-    {
-      "imports": {
-        "firebase/app": "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js",
-        "firebase/auth": "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js",
-        "firebase/firestore": "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"
-      }
-    }
-    </script>
 
     <script type="module">
         import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm";
-        import { initializeApp } from 'firebase/app';
-        import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-        import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
 
-        // --- HÀM HỖ TRỢ VẼ ---
+        // --- HELPER VẼ ---
         function drawCircle(ctx, x, y, r, color, strokeColor = null) {
-            ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-            ctx.fillStyle = color; ctx.fill();
-            if (strokeColor) { ctx.strokeStyle = strokeColor; ctx.lineWidth = 2; ctx.stroke(); }
-        }
-        function drawOval(ctx, x, y, w, h, color) {
-            ctx.beginPath(); ctx.ellipse(x, y, w, h, 0, 0, Math.PI * 2);
-            ctx.fillStyle = color; ctx.fill();
-        }
-
-        // --- FIREBASE CONFIG (TÙY CHỈNH) ---
-        const myFirebaseConfig = { apiKey: "", authDomain: "", projectId: "", storageBucket: "", messagingSenderId: "", appId: "" };
-        let db, auth, user = null;
-        let finalAppId = typeof __app_id !== 'undefined' ? __app_id : 'nong-trai-notion';
-
-        try {
-            const config = myFirebaseConfig.apiKey ? myFirebaseConfig : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
-            if (config) {
-                const app = initializeApp(config);
-                auth = getAuth(app);
-                db = getFirestore(app);
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            if (strokeColor) {
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = 2;
+                ctx.stroke();
             }
-        } catch (e) { console.warn("Firebase Init Error", e); }
+        }
+        
+        function drawOval(ctx, x, y, w, h, color) {
+            ctx.beginPath();
+            ctx.ellipse(x, y, w, h, 0, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
 
-        // --- TRẠNG THÁI ---
+        // --- CẤU HÌNH ---
         const ANIMAL_TYPES = ['pig', 'chicken', 'frog', 'bear', 'cat', 'panda'];
+        
+        let canvas, ctx;
+        let width, height;
+        let particles = [];
+        let audioCtx = null;
+        let bgImage = null; 
+        
+        // State Game - Đã bỏ Firebase
         const state = {
-            classLists: { "Lớp Mẫu": ["Học sinh A", "Học sinh B", "Học sinh C", "Học sinh D", "Học sinh E"] },
-            currentClass: "Lớp Mẫu",
+            classLists: {
+                "Lớp mặc định": ["Nguyễn Văn A", "Trần Thị B", "Lê Văn C", "Hoàng Thị D", "Phạm Văn E", "Vũ Thị F", "Đặng Văn G", "Bùi Thị H"]
+            },
+            currentClass: "Lớp mặc định",
+            names: [],
             animals: [],
             mode: 'IDLE',
+            winners: [],
             cooldown: 0,
-            cameraActive: false,
-            gestureCounter: { type: 'NONE', count: 0 } // Bộ lọc nhiễu cử chỉ
+            cameraActive: false
         };
 
-        let canvas, ctx, width, height, handLandmarker, video, bgImage = null, lastVideoTime = -1;
+        let handLandmarker;
+        let video;
+        let lastVideoTime = -1;
 
-        // --- CLASS ANIMAL ---
+        // --- HỆ THỐNG ÂM THANH ---
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) audioCtx = new AudioContext();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playWinSound() {
+            initAudio();
+            if (!audioCtx) return;
+            const t = audioCtx.currentTime;
+            const notes = [523.25, 659.25, 783.99, 1046.50]; 
+            notes.forEach((freq, i) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, t + i * 0.1);
+                osc.frequency.linearRampToValueAtTime(freq + 10, t + i * 0.1 + 0.1);
+                gain.connect(audioCtx.destination);
+                osc.connect(gain);
+                gain.gain.setValueAtTime(0, t + i * 0.1);
+                gain.gain.linearRampToValueAtTime(0.3, t + i * 0.1 + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + i * 0.1 + 0.4);
+                osc.start(t + i * 0.1);
+                osc.stop(t + i * 0.1 + 0.5);
+            });
+        }
+
+        // --- UI HANDLERS ---
+        function setupUIHandlers() {
+            const classSelector = document.getElementById('classSelector');
+            const newClassInput = document.getElementById('newClassName');
+            const addClassBtn = document.getElementById('addClassBtn');
+            const deleteClassBtn = document.getElementById('deleteClassBtn');
+            const manualInput = document.getElementById('manualInput');
+            const manualBtn = document.getElementById('manualBtn');
+            const saveLocalBtn = document.getElementById('saveLocalBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const fileInput = document.getElementById('fileInput');
+
+            const updateClassSelectorUI = () => {
+                classSelector.innerHTML = '';
+                Object.keys(state.classLists).forEach(name => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.innerText = name;
+                    opt.selected = name === state.currentClass;
+                    classSelector.appendChild(opt);
+                });
+                manualInput.value = (state.classLists[state.currentClass] || []).join('\n');
+            };
+
+            classSelector.addEventListener('change', (e) => {
+                state.currentClass = e.target.value;
+                state.names = [...(state.classLists[state.currentClass] || [])];
+                resetGame();
+                updateClassSelectorUI();
+            });
+
+            addClassBtn.addEventListener('click', () => {
+                const name = newClassInput.value.trim();
+                if (name && !state.classLists[name]) {
+                    state.classLists[name] = [];
+                    state.currentClass = name;
+                    state.names = [];
+                    newClassInput.value = '';
+                    updateClassSelectorUI();
+                    resetGame();
+                    saveToLocal(false);
+                }
+            });
+
+            let deleteConfirmMode = false;
+            deleteClassBtn.addEventListener('click', () => {
+                const keys = Object.keys(state.classLists);
+                if (keys.length <= 1) {
+                    showStatus("Cần giữ ít nhất 1 lớp!", "#ef4444");
+                    return;
+                }
+                if (!deleteConfirmMode) {
+                    deleteConfirmMode = true;
+                    deleteClassBtn.innerText = "XÁC NHẬN?";
+                    deleteClassBtn.classList.add('bg-red-500', 'text-white');
+                    setTimeout(() => {
+                        deleteConfirmMode = false;
+                        deleteClassBtn.innerText = "XÓA";
+                        deleteClassBtn.classList.remove('bg-red-500', 'text-white');
+                    }, 3000);
+                } else {
+                    delete state.classLists[state.currentClass];
+                    state.currentClass = Object.keys(state.classLists)[0];
+                    state.names = [...(state.classLists[state.currentClass] || [])];
+                    deleteConfirmMode = false;
+                    deleteClassBtn.innerText = "XÓA";
+                    deleteClassBtn.classList.remove('bg-red-500', 'text-white');
+                    updateClassSelectorUI();
+                    resetGame();
+                    saveToLocal();
+                }
+            });
+
+            manualBtn.addEventListener('click', () => {
+                const newNames = manualInput.value.split(/\r?\n/).map(n => n.trim()).filter(n => n.length > 0);
+                state.classLists[state.currentClass] = newNames;
+                state.names = newNames;
+                resetGame();
+                showStatus("Đã cập nhật!", "#22c55e");
+            });
+
+            resetBtn.addEventListener('click', () => {
+                state.classLists[state.currentClass] = [];
+                state.names = [];
+                resetGame();
+                manualInput.value = '';
+                showStatus("Đã xóa danh sách!", "#f97316");
+            });
+
+            saveLocalBtn.addEventListener('click', () => saveToLocal(true));
+
+            // Xử lý file upload
+            fileInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0]; if (!file) return;
+                try {
+                    let newNames = [];
+                    if (file.name.endsWith('.xlsx')) {
+                        const data = await file.arrayBuffer();
+                        const workbook = XLSX.read(data);
+                        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1});
+                        newNames = jsonData.flat().map(n => String(n).trim()).filter(n => n.length > 0);
+                    } else {
+                        const text = await file.text();
+                        newNames = text.split(/[\n,]+/).map(n => n.trim()).filter(n => n.length > 0);
+                    }
+                    if (newNames.length > 0) {
+                        state.classLists[state.currentClass] = newNames;
+                        state.names = newNames;
+                        resetGame();
+                        window.updateClassSelectorUI();
+                        showStatus("Đã tải từ file!", "#22c55e");
+                    }
+                } catch (err) { showStatus("Lỗi đọc file", "#ef4444"); }
+                e.target.value = '';
+            });
+
+            // Media inputs
+            const bgmPlayer = document.getElementById('bgmPlayer');
+            document.getElementById('bgmInput').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    bgmPlayer.src = URL.createObjectURL(file);
+                    bgmPlayer.play().catch(e => console.log("Cần tương tác để phát nhạc"));
+                }
+            });
+            document.getElementById('bgInput').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const img = new Image();
+                    img.onload = () => { bgImage = img; };
+                    img.src = URL.createObjectURL(file);
+                }
+            });
+
+            // Fullscreen
+            document.getElementById('fullscreen-btn').addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen();
+                } else {
+                    if (document.exitFullscreen) document.exitFullscreen();
+                }
+            });
+
+            window.updateClassSelectorUI = updateClassSelectorUI;
+        }
+
+        function showStatus(msg, color = "#FFFFFF") {
+            const statusText = document.getElementById('status-text');
+            statusText.innerText = msg;
+            statusText.style.color = color;
+        }
+
+        // --- LOCAL STORAGE LOGIC (Replacement for Cloud) ---
+        function saveToLocal(showNotif = true) {
+            try {
+                const data = {
+                    classLists: state.classLists,
+                    currentClass: state.currentClass,
+                    updatedAt: Date.now()
+                };
+                localStorage.setItem('nongtraimayman_config', JSON.stringify(data));
+                if (showNotif) showStatus("Đã lưu vào Browser ✨", "#22c55e");
+            } catch (error) {
+                console.error(error);
+                if (showNotif) showStatus("Lỗi lưu dữ liệu", "#ef4444");
+            }
+        }
+
+        function loadFromLocal() {
+            try {
+                const raw = localStorage.getItem('nongtraimayman_config');
+                if (raw) {
+                    const data = JSON.parse(raw);
+                    if (data.classLists) {
+                        state.classLists = data.classLists;
+                        state.currentClass = data.currentClass || Object.keys(data.classLists)[0];
+                        // Validate if currentClass exists
+                        if (!state.classLists[state.currentClass]) {
+                            state.currentClass = Object.keys(state.classLists)[0];
+                        }
+                        state.names = [...(state.classLists[state.currentClass] || [])];
+                        window.updateClassSelectorUI();
+                        resetGame();
+                        showStatus("Đã tải dữ liệu cũ", "#22c55e");
+                    }
+                }
+            } catch (error) {
+                console.error("Lỗi tải data local", error);
+            }
+        }
+
+        // --- KHỞI TẠO ---
+        window.onload = async () => {
+            canvas = document.getElementById('game-canvas');
+            ctx = canvas.getContext('2d');
+            resize();
+            window.addEventListener('resize', resize);
+
+            setupUIHandlers();
+            
+            document.body.addEventListener('click', initAudio, { once: true });
+            
+            const menuBtn = document.getElementById('menu-btn');
+            const uiPanel = document.getElementById('ui-panel');
+            menuBtn.addEventListener('click', () => uiPanel.classList.toggle('panel-hidden'));
+            
+            // Auto load data local
+            loadFromLocal();
+            // Nếu không có data, dùng mặc định và update UI
+            if (state.names.length === 0) {
+                 state.names = [...(state.classLists[state.currentClass] || [])];
+                 window.updateClassSelectorUI();
+            }
+
+            createAnimals();
+            await setupVision();
+            document.getElementById('loading').classList.add('opacity-0', 'pointer-events-none');
+            requestAnimationFrame(gameLoop);
+        };
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            if(state.mode === 'IDLE') arrangeAnimalsGrid();
+        }
+
+        // --- GAME LOGIC (GIỮ NGUYÊN) ---
         class Animal {
             constructor(name, index) {
                 this.name = name;
                 this.type = ANIMAL_TYPES[index % ANIMAL_TYPES.length];
-                this.x = Math.random() * window.innerWidth;
-                this.y = Math.random() * window.innerHeight;
-                this.targetX = this.x; this.targetY = this.y;
-                this.size = 40; this.targetSize = 40;
+                this.x = width / 2;
+                this.y = height / 2;
+                this.targetX = this.x;
+                this.targetY = this.y;
+                this.size = 50;
+                this.targetSize = 50;
                 this.angle = 0;
+                this.isWinner = false;
+                this.assignedWidth = 100;
             }
+
             update() {
-                if (state.mode === 'SHUFFLING') {
-                    this.targetX = Math.random() * width;
-                    this.targetY = Math.random() * height;
-                    this.angle = Math.sin(Date.now() / 50) * 0.3;
-                } else {
-                    this.angle = 0;
-                }
                 this.x += (this.targetX - this.x) * 0.1;
                 this.y += (this.targetY - this.y) * 0.1;
                 this.size += (this.targetSize - this.size) * 0.1;
+
+                if (state.mode === 'SHUFFLING') {
+                    this.x += (Math.random() - 0.5) * 10;
+                    this.y += (Math.random() - 0.5) * 10;
+                    this.angle = Math.sin(Date.now() / 100) * 0.2;
+                } else if (state.mode === 'WINNER' && this.isWinner) {
+                    this.y += Math.sin(Date.now() / 150) * 2;
+                    this.angle = 0;
+                } else {
+                    this.angle = 0;
+                }
             }
+
             draw(ctx) {
-                ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
-                ctx.fillStyle = 'rgba(0,0,0,0.1)'; drawOval(ctx, 0, this.size*0.8, this.size, this.size/4, 'rgba(0,0,0,0.1)');
-                drawCircle(ctx, 0, 0, this.size, this.getColor());
-                // Vẽ tên
-                const textW = ctx.measureText(this.name).width + 20;
-                ctx.fillStyle = '#5D4037'; ctx.beginPath(); ctx.roundRect(-textW/2, this.size+5, textW, 20, 5); ctx.fill();
-                ctx.fillStyle = '#FFF'; ctx.font = "bold 11px Arial"; ctx.textAlign="center"; ctx.fillText(this.name, 0, this.size+19);
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.beginPath();
+                ctx.ellipse(0, this.size/1.4, this.size/1.2, this.size/4, 0, 0, Math.PI * 2);
+                ctx.fill();
+                this.drawIcon(ctx, this.size);
+                
+                const labelY = this.size * 0.85;
+                const maxBoxWidth = this.isWinner ? Math.min(width * 0.9, 800) : (this.assignedWidth || width) * 0.95;
+                
+                let fontSize = this.isWinner ? this.size * 0.5 : this.size * 0.35;
+                ctx.font = `bold ${fontSize}px Arial`;
+
+                const words = this.name.split(' ');
+                let lines = [];
+                let currentLine = words[0];
+
+                for (let i = 1; i < words.length; i++) {
+                    const word = words[i];
+                    const w = ctx.measureText(currentLine + " " + word).width;
+                    if (w < maxBoxWidth - 20) {
+                        currentLine += " " + word;
+                    } else {
+                        lines.push(currentLine);
+                        currentLine = word;
+                    }
+                }
+                lines.push(currentLine);
+
+                let maxLineWidth = 0;
+                lines.forEach(l => {
+                    const w = ctx.measureText(l).width;
+                    if (w > maxLineWidth) maxLineWidth = w;
+                });
+
+                if (maxLineWidth > maxBoxWidth - 20) {
+                    const scale = (maxBoxWidth - 20) / maxLineWidth;
+                    fontSize *= scale;
+                    ctx.font = `bold ${fontSize}px Arial`;
+                    maxLineWidth = maxLineWidth * scale;
+                }
+
+                const lineHeight = fontSize * 1.3; 
+                const totalTextHeight = lines.length * lineHeight;
+                const boxHeight = totalTextHeight + (fontSize * 0.8); 
+                const boxWidth = Math.max(this.size * 1.5, maxLineWidth + (fontSize * 1.5));
+
+                ctx.fillStyle = '#5D4037'; 
+                ctx.beginPath();
+                ctx.roundRect(-boxWidth/2, labelY, boxWidth, boxHeight, 8);
+                ctx.fill();
+                ctx.strokeStyle = '#8D6E63'; ctx.lineWidth = 2; ctx.stroke();
+
+                ctx.fillStyle = '#FFF8E1'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                const startY = labelY + (boxHeight - totalTextHeight) / 2 + (lineHeight / 2);
+                lines.forEach((line, i) => ctx.fillText(line, 0, startY + i * lineHeight));
+
                 ctx.restore();
             }
-            getColor() {
-                const colors = { pig: '#F06292', chicken: '#FFF', frog: '#66BB6A', bear: '#795548', cat: '#FFA726', panda: '#FAFAFA' };
-                return colors[this.type];
+
+            drawIcon(ctx, s) {
+                const r = s * 0.8;
+                switch(this.type) {
+                    case 'pig':
+                        drawCircle(ctx, -r*0.6, -r*0.7, r*0.3, '#E91E63', '#880E4F');
+                        drawCircle(ctx, r*0.6, -r*0.7, r*0.3, '#E91E63', '#880E4F');
+                        drawCircle(ctx, 0, 0, r, '#F06292', '#880E4F');
+                        drawOval(ctx, 0, r*0.2, r*0.35, r*0.25, '#EC407A');
+                        drawCircle(ctx, -r*0.1, r*0.2, r*0.08, '#880E4F');
+                        drawCircle(ctx, r*0.1, r*0.2, r*0.08, '#880E4F');
+                        this.drawEyes(ctx, r);
+                        break;
+                    case 'frog':
+                        drawCircle(ctx, -r*0.5, -r*0.7, r*0.35, '#66BB6A', '#1B5E20');
+                        drawCircle(ctx, r*0.5, -r*0.7, r*0.35, '#66BB6A', '#1B5E20');
+                        drawOval(ctx, 0, 0, r, r*0.8, '#43A047', '#1B5E20');
+                        drawCircle(ctx, -r*0.6, r*0.1, r*0.15, 'rgba(233,30,99,0.5)');
+                        drawCircle(ctx, r*0.6, r*0.1, r*0.15, 'rgba(233,30,99,0.5)');
+                        ctx.beginPath(); ctx.arc(0, 0, r*0.5, 0.2, Math.PI - 0.2); ctx.strokeStyle = '#1B5E20'; ctx.stroke();
+                        drawCircle(ctx, -r*0.5, -r*0.7, r*0.12, 'black');
+                        drawCircle(ctx, r*0.5, -r*0.7, r*0.12, 'black');
+                        break;
+                    case 'chicken':
+                        drawCircle(ctx, 0, -r*0.8, r*0.25, '#D32F2F');
+                        drawCircle(ctx, -r*0.3, -r*0.7, r*0.2, '#D32F2F');
+                        drawCircle(ctx, r*0.3, -r*0.7, r*0.2, '#D32F2F');
+                        drawCircle(ctx, 0, 0, r*0.9, '#FFFFFF', '#FBC02D');
+                        ctx.beginPath(); ctx.moveTo(-r*0.15, r*0.1); ctx.lineTo(r*0.15, r*0.1); ctx.lineTo(0, r*0.4); ctx.fillStyle = '#F57C00'; ctx.fill();
+                        this.drawEyes(ctx, r);
+                        break;
+                    case 'bear':
+                        drawCircle(ctx, -r*0.7, -r*0.6, r*0.3, '#5D4037', '#3E2723');
+                        drawCircle(ctx, r*0.7, -r*0.6, r*0.3, '#5D4037', '#3E2723');
+                        drawCircle(ctx, 0, 0, r, '#795548', '#3E2723');
+                        drawOval(ctx, 0, r*0.2, r*0.4, r*0.3, '#D7CCC8');
+                        drawOval(ctx, 0, r*0.1, r*0.15, r*0.1, '#3E2723');
+                        this.drawEyes(ctx, r);
+                        break;
+                    case 'cat':
+                        ctx.fillStyle = '#FFA726'; ctx.strokeStyle = '#E65100';
+                        ctx.beginPath(); ctx.moveTo(-r*0.7, -r*0.2); ctx.lineTo(-r*0.9, -r*0.9); ctx.lineTo(-r*0.2, -r*0.7); ctx.fill(); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(r*0.7, -r*0.2); ctx.lineTo(r*0.9, -r*0.9); ctx.lineTo(r*0.2, -r*0.7); ctx.fill(); ctx.stroke();
+                        drawCircle(ctx, 0, 0, r, '#FFA726', '#E65100');
+                        drawCircle(ctx, 0, r*0.2, r*0.1, '#E65100');
+                        this.drawEyes(ctx, r);
+                        break;
+                    case 'panda':
+                        drawCircle(ctx, -r*0.7, -r*0.6, r*0.3, '#212121');
+                        drawCircle(ctx, r*0.7, -r*0.6, r*0.3, '#212121');
+                        drawCircle(ctx, 0, 0, r, '#FAFAFA', '#9E9E9E');
+                        drawOval(ctx, -r*0.35, -r*0.1, r*0.25, r*0.2, '#212121');
+                        drawOval(ctx, r*0.35, -r*0.1, r*0.25, r*0.2, '#212121');
+                        drawCircle(ctx, -r*0.35, -r*0.15, r*0.08, 'white');
+                        drawCircle(ctx, r*0.35, -r*0.15, r*0.08, 'white');
+                        break;
+                }
+            }
+
+            drawEyes(ctx, r) {
+                drawCircle(ctx, -r*0.3, -r*0.15, r*0.1, 'black');
+                drawCircle(ctx, r*0.3, -r*0.15, r*0.1, 'black');
             }
         }
 
-        // --- GIAO DIỆN ---
-        function updateUI() {
-            const sel = document.getElementById('classSelector');
-            sel.innerHTML = '';
-            Object.keys(state.classLists).forEach(c => {
-                const opt = document.createElement('option');
-                opt.value = c; opt.innerText = c; opt.selected = (c === state.currentClass);
-                sel.appendChild(opt);
-            });
-            document.getElementById('manualInput').value = state.classLists[state.currentClass].join('\n');
+        function createAnimals() {
+            state.animals = state.names.map((name, idx) => new Animal(name, idx));
+            arrangeAnimalsGrid();
         }
 
-        function initHandlers() {
-            document.getElementById('menu-btn').onclick = () => document.getElementById('ui-panel').classList.toggle('panel-hidden');
-            document.getElementById('classSelector').onchange = (e) => { state.currentClass = e.target.value; resetGame(); updateUI(); };
-            document.getElementById('addClassBtn').onclick = () => {
-                const name = document.getElementById('newClassName').value.trim();
-                if(name) { state.classLists[name] = []; state.currentClass = name; updateUI(); resetGame(); }
-            };
-            document.getElementById('deleteClassBtn').onclick = () => {
-                if(Object.keys(state.classLists).length <= 1) return;
-                delete state.classLists[state.currentClass];
-                state.currentClass = Object.keys(state.classLists)[0];
-                updateUI(); resetGame();
-            };
-            document.getElementById('manualBtn').onclick = () => {
-                const names = document.getElementById('manualInput').value.split('\n').filter(n => n.trim());
-                state.classLists[state.currentClass] = names;
-                resetGame();
-                showStatus("Đã cập nhật danh sách!", "#22c55e");
-            };
-            document.getElementById('bgmInput').onchange = (e) => {
-                const file = e.target.files[0];
-                if(file) { document.getElementById('bgmPlayer').src = URL.createObjectURL(file); document.getElementById('bgmPlayer').play(); }
-            };
-            document.getElementById('bgInput').onchange = (e) => {
-                const file = e.target.files[0];
-                if(file) { const img = new Image(); img.onload = () => { bgImage = img; }; img.src = URL.createObjectURL(file); }
-            };
-            document.getElementById('saveCloudBtn').onclick = () => saveToCloud(true);
-        }
-
-        async function saveToCloud(notify) {
-            if(!user || !db) return alert("Chưa cấu hình Firebase cá nhân!");
-            const ref = doc(db, 'artifacts', finalAppId, 'users', user.uid, 'settings', 'classConfig');
-            await setDoc(ref, { classLists: state.classLists, currentClass: state.currentClass });
-            if(notify) showStatus("Đã lưu thành công! ✨", "#22c55e");
-        }
-
-        async function loadFromCloud() {
-            if(!user || !db) return;
-            const ref = doc(db, 'artifacts', finalAppId, 'users', user.uid, 'settings', 'classConfig');
-            const snap = await getDoc(ref);
-            if(snap.exists()) {
-                const data = snap.data();
-                state.classLists = data.classLists; state.currentClass = data.currentClass;
-                updateUI(); resetGame();
-            }
-        }
-
-        function showStatus(msg, color="#FFF") {
-            const el = document.getElementById('status-text');
-            el.innerText = msg; el.style.color = color;
-        }
-
-        // --- GAME LOGIC ---
-        function resetGame() {
-            state.mode = 'IDLE';
-            state.animals = state.classLists[state.currentClass].map((n, i) => new Animal(n, i));
-            arrangeGrid();
-        }
-
-        function arrangeGrid() {
+        function arrangeAnimalsGrid() {
             const count = state.animals.length;
-            if(count === 0) return;
-            const cols = Math.ceil(Math.sqrt(count * (width/height)));
-            const rows = Math.ceil(count / cols);
-            const cellW = (width * 0.8) / cols, cellH = (height * 0.7) / rows;
-            state.animals.forEach((a, i) => {
-                a.targetX = (i % cols + 0.5) * cellW + (width * 0.1);
-                a.targetY = (Math.floor(i / cols) + 0.5) * cellH + (height * 0.15);
-                a.targetSize = Math.min(cellW, cellH) * 0.35;
+            const aspectRatio = width / height;
+            let cols = Math.ceil(Math.sqrt(count * aspectRatio));
+            let rows = Math.ceil(count / cols);
+            if (cols * rows < count) rows++;
+            const safeW = width * 0.95, safeH = height * 0.85; 
+            const cellW = safeW / cols, cellH = safeH / rows;
+            const cellSize = Math.min(cellW, cellH); 
+            const gridW = cols * cellW, gridH = rows * cellH;
+            const startX = (width - gridW) / 2, startY = (height - gridH) / 2;
+
+            state.animals.forEach((anim, i) => {
+                const c = i % cols, r = Math.floor(i / cols);
+                anim.targetX = startX + c * cellW + cellW / 2;
+                anim.targetY = startY + r * cellH + cellH / 2;
+                anim.assignedWidth = cellW;
+                anim.targetSize = Math.min(65, Math.max(15, cellSize * 0.40)); 
+                anim.isWinner = false;
             });
+        }
+
+        function handleLogic(gesture) {
+            if (gesture === 'OPEN_PALM' && state.mode === 'WINNER') state.cooldown = 0; 
+            if (state.cooldown > 0) { state.cooldown--; return; }
+
+            if (gesture === 'OPEN_PALM' && state.mode !== 'SHUFFLING') {
+                state.mode = 'SHUFFLING';
+                showStatus("🌪️ Đang xoay...", "#FFD700");
+                state.winners = []; state.animals.forEach(a => a.isWinner = false);
+                if(window.shuffleInterval) clearInterval(window.shuffleInterval);
+                window.shuffleInterval = setInterval(() => {
+                    if(state.mode !== 'SHUFFLING') return clearInterval(window.shuffleInterval);
+                    state.animals.forEach(anim => {
+                        anim.targetX = Math.random() * (width - 100) + 50;
+                        anim.targetY = Math.random() * (height - 100) + 50;
+                    });
+                }, 500);
+            } else if ((gesture === 'ONE' || gesture === 'TWO' || gesture === 'THREE') && state.mode === 'SHUFFLING') {
+                let count = gesture === 'THREE' ? 3 : (gesture === 'TWO' ? 2 : 1);
+                state.mode = 'WINNER';
+                showStatus(`🎉 Chúc mừng ${count} bạn!`, "#76ff03");
+                pickWinners(count);
+                state.cooldown = 50; 
+            } else if (state.mode === 'IDLE') {
+                showStatus("Sẵn sàng!", "#FFFFFF");
+            }
         }
 
         function pickWinners(count) {
-            if(state.animals.length === 0) return;
-            state.mode = 'WINNER';
-            let pool = state.animals.map((_, i) => i);
-            let winners = [];
-            for(let i=0; i<count && pool.length>0; i++) winners.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
-            
-            state.animals.forEach((a, i) => {
-                if(winners.includes(i)) {
-                    const idx = winners.indexOf(i);
-                    a.targetX = width/2; a.targetY = height/2 + (idx - (winners.length-1)/2) * 120;
-                    a.targetSize = 80;
+            let indices = [];
+            while(indices.length < count && indices.length < state.animals.length) {
+                let r = Math.floor(Math.random() * state.animals.length);
+                if(!indices.includes(r)) indices.push(r);
+            }
+            state.winners = indices; playWinSound();
+            const centerX = width / 2, marginY = height * 0.15;
+            const availableHeight = height - (2 * marginY);
+            const slotHeight = availableHeight / count; 
+            const finalSize = Math.min(180, Math.max(50, (slotHeight * 0.85) / 3.2));
+
+            state.animals.forEach((anim, idx) => {
+                if (indices.includes(idx)) {
+                    anim.isWinner = true;
+                    const winPosIndex = indices.indexOf(idx);
+                    anim.targetX = centerX;
+                    anim.targetY = marginY + (winPosIndex * slotHeight) + (slotHeight / 2);
+                    anim.targetSize = finalSize;
+                    anim.assignedWidth = width * 0.9; 
+                    createConfetti(anim.targetX, anim.targetY);
                 } else {
                     const angle = Math.random() * Math.PI * 2;
-                    a.targetX = width/2 + Math.cos(angle) * width;
-                    a.targetY = height/2 + Math.sin(angle) * height;
-                    a.targetSize = 10;
+                    anim.targetX = centerX + Math.cos(angle) * (width/1.3);
+                    anim.targetY = (height/2) + Math.sin(angle) * (width/1.3);
+                    anim.targetSize = 20; 
                 }
             });
-            state.cooldown = 100; // Đợi 1 lúc trước khi cho phép shuffle lại
         }
 
+        function resetGame() {
+            state.mode = 'IDLE'; state.cooldown = 0; state.winners = [];
+            createAnimals();
+        }
+
+        function drawBackground() {
+            if (bgImage) {
+                const scale = Math.max(width / bgImage.width, height / bgImage.height);
+                ctx.drawImage(bgImage, (width/2)-(bgImage.width/2)*scale, (height/2)-(bgImage.height/2)*scale, bgImage.width*scale, bgImage.height*scale);
+            } else {
+                const gradient = ctx.createLinearGradient(0, 0, 0, height);
+                gradient.addColorStop(0, "#4FC3F7"); gradient.addColorStop(0.5, "#B3E5FC");
+                gradient.addColorStop(0.5, "#7CB342"); gradient.addColorStop(1, "#33691E");
+                ctx.fillStyle = gradient; ctx.fillRect(0, 0, width, height);
+            }
+        }
+
+        function createConfetti(x, y) {
+            for(let i=0; i<40; i++) {
+                particles.push({
+                    x, y, vx: (Math.random()-0.5)*20, vy: (Math.random()-0.5)*20-5,
+                    color: `hsl(${Math.random()*360}, 100%, 50%)`, life: 120
+                });
+            }
+        }
+
+        function drawParticles() {
+            for(let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.4; p.life--;
+                ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 8, 8);
+                if(p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, width, height); drawBackground();
+            const losers = state.animals.filter(a => !a.isWinner), winners = state.animals.filter(a => a.isWinner);
+            losers.forEach(anim => { anim.update(); anim.draw(ctx); });
+            if (state.mode === 'WINNER') { ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, width, height); }
+            winners.forEach(anim => { anim.update(); anim.draw(ctx); });
+            drawParticles(); processVision();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- CÀI ĐẶT CAMERA & MEDIA PIPE ---
         async function setupVision() {
             try {
                 const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
                 handLandmarker = await HandLandmarker.createFromOptions(vision, {
-                    baseOptions: { 
-                        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-                        delegate: "GPU"
-                    },
-                    runningMode: "VIDEO", numHands: 1,
-                    minHandDetectionConfidence: 0.6,
-                    minHandPresenceConfidence: 0.6
+                    baseOptions: { modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`, delegate: "GPU" },
+                    runningMode: "VIDEO", numHands: 1
                 });
-                video = document.getElementById("camera-feed");
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360, frameRate: 30 } });
-                video.srcObject = stream;
-                state.cameraActive = true;
-                return new Promise(r => video.onloadeddata = r);
-            } catch (e) { showStatus("Lỗi kết nối Camera!", "#ef4444"); }
-        }
-
-        function gameLoop() {
-            ctx.clearRect(0,0,width,height);
-            if(bgImage) {
-                const s = Math.max(width/bgImage.width, height/bgImage.height);
-                ctx.drawImage(bgImage, (width-bgImage.width*s)/2, (height-bgImage.height*s)/2, bgImage.width*s, bgImage.height*s);
-            } else {
-                const g = ctx.createLinearGradient(0,0,0,height); g.addColorStop(0, '#4FC3F7'); g.addColorStop(1, '#81C784');
-                ctx.fillStyle = g; ctx.fillRect(0,0,width,height);
-            }
-
-            state.animals.forEach(a => { a.update(); a.draw(ctx); });
-            if(state.cooldown > 0) state.cooldown--;
-
-            // Xử lý AI Cử chỉ
-            if(state.cameraActive && handLandmarker && video.currentTime !== lastVideoTime) {
-                lastVideoTime = video.currentTime;
-                const res = handLandmarker.detectForVideo(video, Date.now());
                 
-                let detectedType = 'NONE';
-                if(res.landmarks && res.landmarks.length > 0) {
-                    const lm = res.landmarks[0];
-                    const isUp = (tip, pip) => lm[tip].y < lm[pip].y; // Ngón tay giơ lên
-                    const fingers = [8, 12, 16, 20].filter(idx => isUp(idx, idx-2)).length;
-                    
-                    if(fingers >= 4) detectedType = 'OPEN_PALM';
-                    else if(fingers === 1) detectedType = 'ONE';
-                    else if(fingers === 2) detectedType = 'TWO';
-                    else if(fingers === 3) detectedType = 'THREE';
+                video = document.getElementById("camera-feed");
+                
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { width: 320, height: 240, facingMode: "user" } 
+                    });
+                    video.srcObject = stream;
+                    state.cameraActive = true;
+                    return new Promise(resolve => { video.onloadeddata = resolve; });
+                } catch (mediaError) {
+                    console.warn("Camera Error:", mediaError);
+                    state.cameraActive = false;
+                    showStatus("Không có Camera! (Chế độ xem)", "#ef4444");
+                    return Promise.resolve();
                 }
-
-                // Lọc nhiễu: Cử chỉ phải ổn định 5 khung hình
-                if(detectedType === state.gestureCounter.type) {
-                    state.gestureCounter.count++;
-                } else {
-                    state.gestureCounter.type = detectedType;
-                    state.gestureCounter.count = 0;
-                }
-
-                if(state.gestureCounter.count >= 5 && state.cooldown <= 0) {
-                    const stableGesture = state.gestureCounter.type;
-                    
-                    if(stableGesture === 'OPEN_PALM' && state.mode !== 'SHUFFLING') {
-                        state.mode = 'SHUFFLING'; 
-                        showStatus("🌪️ Đang xoay vòng...", "#FFD700");
-                    } else if(['ONE', 'TWO', 'THREE'].includes(stableGesture) && state.mode === 'SHUFFLING') {
-                        const count = stableGesture === 'ONE' ? 1 : (stableGesture === 'TWO' ? 2 : 3);
-                        pickWinners(count);
-                        showStatus(`🎉 Đã chọn ${count} bạn!`, "#22c55e");
-                    } else if(stableGesture === 'OPEN_PALM' && state.mode === 'WINNER') {
-                        // Cho phép quay lại trạng thái IDLE bằng cách xòe tay khi đang hiện kết quả
-                        resetGame();
-                        showStatus("Sẵn sàng!", "#FFF");
-                    }
-                }
+            } catch (err) {
+                console.error("AI Error:", err);
+                showStatus("Lỗi khởi tạo AI!", "#ef4444");
+                return Promise.resolve();
             }
-            requestAnimationFrame(gameLoop);
         }
 
-        window.onload = async () => {
-            canvas = document.getElementById('game-canvas'); ctx = canvas.getContext('2d');
-            width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight;
-            initHandlers();
-            if(auth) {
-                onAuthStateChanged(auth, u => { 
-                    user = u; 
-                    document.getElementById('auth-status').innerText = u ? "Cloud Online (" + u.uid.substring(0,4) + ")" : "Chế độ Offline";
-                    if(u) loadFromCloud(); 
-                });
-                signInAnonymously(auth);
+        function processVision() {
+            if (state.cameraActive && handLandmarker && video.currentTime !== lastVideoTime && video.readyState >= 2) {
+                lastVideoTime = video.currentTime;
+                const result = handLandmarker.detectForVideo(video, Date.now());
+                if (result.landmarks.length > 0) handleLogic(detectGesture(result.landmarks[0]));
             }
-            updateUI(); resetGame();
-            await setupVision();
-            document.getElementById('loading').style.display = 'none';
-            if(state.cameraActive) showStatus("Sẵn sàng! Xòe tay để quay.");
-            gameLoop();
-        };
-        
-        window.onresize = () => { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; arrangeGrid(); };
+        }
+
+        function detectGesture(lm) {
+            const isUp = (t, p) => lm[t].y < lm[p].y;
+            const i=isUp(8,6), m=isUp(12,10), r=isUp(16,14), p=isUp(20,18);
+            let c=0; if(i)c++; if(m)c++; if(r)c++; if(p)c++;
+            if(c>=4) return 'OPEN_PALM';
+            if(i&&m&&r&&!p) return 'THREE';
+            if(i&&m&&!r&&!p) return 'TWO';
+            if(i&&!m&&!r&&!p) return 'ONE';
+            return 'NONE';
+        }
     </script>
 </body>
 </html>
