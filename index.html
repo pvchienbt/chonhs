@@ -3,20 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Học sinh may mắn</title>
+    <title>Nông Trại May Mắn - Ứng Dụng Chọn Học Sinh AR</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- MediaPipe -->
+    <!-- MediaPipe - Hand Tracking -->
     <script async src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js"></script>
-    <!-- Thư viện đọc Excel (SheetJS) -->
+    <!-- Thư viện xử lý File Excel/Word -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <!-- Thư viện đọc Word (Mammoth) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #87CEEB; }
         
-        /* Layout chính */
         #game-canvas {
             display: block;
             width: 100vw;
@@ -24,17 +22,17 @@
             touch-action: none;
         }
 
-        /* Camera PIP */
+        /* Camera overlay (Picture in Picture style) */
         #camera-container {
             position: absolute;
             bottom: 20px;
             right: 20px;
-            width: 200px;
-            height: 150px;
-            border-radius: 15px;
+            width: 180px;
+            height: 135px;
+            border-radius: 12px;
             overflow: hidden;
-            border: 4px solid white;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            border: 3px solid white;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
             z-index: 20;
             background: black;
         }
@@ -42,60 +40,42 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scaleX(-1); /* Gương */
-        }
-        .cam-label {
-            position: absolute;
-            bottom: 5px;
-            right: 5px;
-            background: rgba(0,0,0,0.6);
-            color: white;
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 4px;
+            transform: scaleX(-1);
         }
 
-        /* Nút Menu Cài Đặt */
         #menu-btn {
             position: absolute;
             top: 20px;
             left: 20px;
             z-index: 40;
             background: white;
-            border: none;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            font-size: 24px;
+            width: 48px;
+            height: 48px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            cursor: pointer;
-            transition: transform 0.2s, background 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
         }
-        #menu-btn:hover {
-            transform: scale(1.1);
-            background: #f0f9ff;
-        }
+        #menu-btn:hover { transform: scale(1.1); }
 
-        /* UI Panel (Settings) */
         #ui-panel {
             position: absolute;
             top: 80px;
             left: 20px;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            width: 340px;
+            background: rgba(255, 255, 255, 0.98);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            width: 350px;
             z-index: 30;
-            backdrop-filter: blur(5px);
-            border: 2px solid #e2e8f0;
+            backdrop-filter: blur(8px);
+            border: 1px solid #e2e8f0;
+            max-height: 80vh;
+            overflow-y: auto;
             transition: opacity 0.3s, transform 0.3s;
-            transform-origin: top left;
-            max-height: 85vh; 
-            overflow-y: auto; 
         }
         
         .panel-hidden {
@@ -104,136 +84,124 @@
             pointer-events: none;
         }
 
-        /* Loading */
         #loading {
             position: fixed;
             inset: 0;
-            background: #e0f2fe;
+            background: #f0f9ff;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 100;
-            transition: opacity 0.5s;
         }
 
-        /* Scrollbar styling */
-        #ui-panel::-webkit-scrollbar { width: 6px; }
-        #ui-panel::-webkit-scrollbar-track { background: transparent; }
-        #ui-panel::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        #status-text {
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .btn-primary { @apply bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition shadow; }
+        .btn-success { @apply bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition shadow; }
+        .btn-danger { @apply bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition shadow; }
     </style>
 </head>
 <body>
 
-    <!-- Loading Screen -->
+    <!-- Màn hình tải -->
     <div id="loading">
-        <div class="text-6xl mb-4 animate-bounce">🎨</div>
-        <h1 class="text-2xl font-bold text-blue-600 mb-2">Học Sinh May Mắn</h1>
-        <p id="loading-status" class="text-gray-600">Đang khởi tạo cấu hình lớp học...</p>
+        <div class="text-6xl mb-4 animate-bounce">🚜</div>
+        <h1 class="text-2xl font-bold text-blue-700">Nông Trại May Mắn AR</h1>
+        <p id="loading-status" class="text-gray-500 mt-2 italic">Đang tải bộ não AI và dữ liệu...</p>
     </div>
 
-    <!-- Nút Mở Menu -->
-    <button id="menu-btn" title="Cài đặt">⚙️</button>
+    <!-- Nút Menu -->
+    <div id="menu-btn" title="Cài đặt">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+    </div>
 
-    <!-- UI Panel (Cài đặt) -->
+    <!-- Bảng điều khiển -->
     <div id="ui-panel" class="panel-hidden">
-        <h1 class="text-xl font-bold text-green-700 flex items-center gap-2 mb-4">
-            <span>🌻</span> Quản lý lớp học
-        </h1>
+        <h2 class="text-xl font-bold text-green-700 mb-4 flex items-center gap-2">
+            <span>🌾</span> Quản lý lớp học
+        </h2>
         
         <div class="space-y-4">
-            <!-- Khu vực CHỌN LỚP -->
-            <div class="bg-green-50 p-3 rounded-lg border border-green-100">
-                <label class="block text-xs font-bold text-green-800 mb-1">🏫 Chọn lớp đang dạy:</label>
+            <!-- Chọn lớp -->
+            <div class="bg-blue-50 p-3 rounded-xl border border-blue-100">
+                <label class="block text-xs font-bold text-blue-800 mb-2 uppercase tracking-wider">Lớp hiện tại:</label>
                 <div class="flex gap-2">
-                    <select id="classSelector" class="flex-1 p-2 text-sm rounded border border-gray-300 focus:outline-none focus:border-green-500">
-                        <option value="Lớp mặc định">Lớp mặc định</option>
+                    <select id="classSelector" class="flex-1 p-2 rounded-lg border border-gray-300 bg-white text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                        <!-- Lớp học sẽ được thêm vào đây -->
                     </select>
-                    <button id="deleteClassBtn" class="bg-red-100 hover:bg-red-200 text-red-600 p-2 rounded border border-red-200 transition-all text-xs font-bold" title="Xóa lớp này">
-                        XÓA LỚP
+                    <button id="deleteClassBtn" class="bg-red-50 hover:bg-red-100 text-red-600 p-2 rounded-lg border border-red-200 transition-colors" title="Xóa lớp">
+                        🗑️
                     </button>
-                </div>
-                
-                <div class="mt-3 pt-3 border-t border-green-200">
-                    <label class="block text-xs font-bold text-green-800 mb-1">➕ Thêm lớp mới:</label>
-                    <div class="flex gap-2">
-                        <input type="text" id="newClassName" class="flex-1 p-2 text-sm rounded border border-gray-300 focus:outline-none focus:border-green-500" placeholder="Tên lớp (VD: 1A)">
-                        <button id="addClassBtn" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm font-bold shadow-sm">Thêm</button>
-                    </div>
                 </div>
             </div>
 
-            <hr class="border-gray-200">
-
-            <!-- Khu vực: Nhập từ File -->
+            <!-- Thêm lớp mới -->
             <div class="flex gap-2">
-                <label class="flex-1 cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-2 py-2 rounded-lg text-sm text-center font-medium transition shadow-sm flex flex-col justify-center items-center gap-0.5 leading-tight">
-                    <span>📂 Tải File Tên</span>
-                    <span class="text-[10px] opacity-80 font-normal">Excel, Word, TXT</span>
-                    <input type="file" id="fileInput" accept=".txt,.csv,.xlsx,.xls,.docx" class="hidden">
+                <input type="text" id="newClassName" class="flex-1 p-2 border rounded-lg text-sm" placeholder="Tên lớp mới...">
+                <button id="addClassBtn" class="bg-green-600 text-white px-4 rounded-lg text-sm font-bold shadow-sm hover:bg-green-700">Thêm</button>
+            </div>
+
+            <hr>
+
+            <!-- Công cụ -->
+            <div class="grid grid-cols-2 gap-2">
+                <label class="cursor-pointer bg-blue-100 hover:bg-blue-200 text-blue-700 p-2 rounded-lg text-xs text-center font-bold border border-blue-200">
+                    📂 Tải File (Excel/Word)
+                    <input type="file" id="fileInput" accept=".txt,.xlsx,.xls,.docx" class="hidden">
                 </label>
-                <button id="resetBtn" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition shadow-sm" title="Xóa hết danh sách lớp hiện tại">
-                    🔄 Xóa hết
+                <button id="resetNamesBtn" class="bg-gray-100 hover:bg-gray-200 text-gray-700 p-2 rounded-lg text-xs font-bold border border-gray-200">
+                    🔄 Xóa danh sách
                 </button>
             </div>
 
-            <!-- Khu vực: Nhạc & Nền -->
             <div class="grid grid-cols-2 gap-2">
-                <label class="cursor-pointer bg-purple-500 hover:bg-purple-600 text-white px-2 py-2 rounded-lg text-sm text-center font-medium transition shadow-sm flex items-center justify-center gap-1" title="Tải nhạc nền">
-                    <span>🎵 Nhạc</span>
+                <label class="cursor-pointer bg-purple-100 hover:bg-purple-200 text-purple-700 p-2 rounded-lg text-xs text-center font-bold border border-purple-200">
+                    🎵 Nhạc nền
                     <input type="file" id="bgmInput" accept="audio/*" class="hidden">
                 </label>
-                <label class="cursor-pointer bg-teal-500 hover:bg-teal-600 text-white px-2 py-2 rounded-lg text-sm text-center font-medium transition shadow-sm flex items-center justify-center gap-1" title="Tải ảnh nền">
-                    <span>🖼️ Nền</span>
+                <label class="cursor-pointer bg-teal-100 hover:bg-teal-200 text-teal-700 p-2 rounded-lg text-xs text-center font-bold border border-teal-200">
+                    🖼️ Ảnh nền
                     <input type="file" id="bgInput" accept="image/*" class="hidden">
                 </label>
             </div>
-            <audio id="bgmPlayer" loop class="hidden"></audio>
+            <audio id="bgmPlayer" loop></audio>
 
-            <hr class="border-gray-200">
-
-            <!-- Khu vực: Nhập Thủ Công -->
-            <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                <label class="block text-xs font-bold text-blue-800 mb-1">📝 Học sinh lớp <span id="currentClassLabel">mặc định</span>:</label>
-                <textarea id="manualInput" rows="5" class="w-full p-2 text-sm rounded border border-gray-300 focus:outline-none focus:border-blue-500 mb-2" placeholder="Nhập tên học sinh..."></textarea>
-                <div class="flex flex-col gap-2">
-                    <button id="manualBtn" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded text-sm font-bold transition shadow-sm">
-                        ✅ Cập nhật danh sách
-                    </button>
-                    <button id="saveCloudBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded text-sm font-bold transition shadow-sm flex items-center justify-center gap-2">
-                        ☁️ Lưu cấu hình
-                    </button>
-                </div>
+            <!-- Nhập tay -->
+            <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                <label class="block text-xs font-bold text-gray-600 mb-1">Học sinh lớp <span id="currentClassLabel" class="text-blue-600"></span>:</label>
+                <textarea id="manualInput" rows="4" class="w-full p-2 text-sm rounded-lg border border-gray-300 mb-2 focus:ring-2 focus:ring-green-400 outline-none"></textarea>
+                <button id="manualBtn" class="w-full bg-green-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-green-700 shadow-md">✅ Cập nhật học sinh</button>
             </div>
-            
-            <p class="text-[10px] text-gray-400 text-center italic">Hệ thống tự động đồng bộ khi thực hiện thay đổi lớp.</p>
+
+            <button id="saveCloudBtn" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-blue-700 flex items-center justify-center gap-2">
+                ☁️ LƯU LÊN ĐÁM MÂY
+            </button>
         </div>
     </div>
 
-    <!-- Trạng thái nổi bật -->
-    <div id="status-container" class="absolute top-5 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
-        <div id="status-text" class="text-2xl font-black text-white px-6 py-2 rounded-full bg-black/30 backdrop-blur-md shadow-lg border border-white/20 transition-all">
+    <!-- Status Text Overlay -->
+    <div id="status-container" class="absolute top-10 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+        <div id="status-text" class="text-3xl font-black text-white px-8 py-3 rounded-full bg-black/40 backdrop-blur-lg border border-white/20 shadow-2xl transition-all">
             Đang tải dữ liệu...
         </div>
     </div>
 
-    <!-- BẢN QUYỀN -->
-    <div class="fixed bottom-3 left-5 pointer-events-none z-50">
-        <div class="text-white/40 font-bold text-sm font-mono tracking-wider select-none drop-shadow-md" style="text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">
-            @NhomCaCon-2025-2026
-        </div>
+    <!-- Bản quyền -->
+    <div class="fixed bottom-3 left-5 pointer-events-none z-50 opacity-40 hover:opacity-100 transition-opacity">
+        <div class="text-white font-mono text-xs tracking-tighter">@NhomCaCon-2025-2026</div>
     </div>
 
-    <!-- Camera PIP -->
+    <!-- Camera Feed -->
     <div id="camera-container">
         <video id="camera-feed" autoplay playsinline muted></video>
         <div class="cam-label">AI Tracking</div>
     </div>
 
-    <!-- Game Canvas -->
     <canvas id="game-canvas"></canvas>
 
-    <!-- Firebase Imports -->
     <script type="importmap">
     {
       "imports": {
@@ -248,9 +216,9 @@
         import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm";
         import { initializeApp } from 'firebase/app';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-        import { getFirestore, doc, setDoc, getDoc, collection } from 'firebase/firestore';
+        import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
 
-        // --- HELPER VẼ ---
+        // --- HÀM HỖ TRỢ VẼ ---
         function drawCircle(ctx, x, y, r, color, strokeColor = null) {
             ctx.beginPath();
             ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -270,277 +238,39 @@
             ctx.fill();
         }
 
-        // --- CẤU HÌNH ---
-        const ANIMAL_TYPES = ['pig', 'chicken', 'frog', 'bear', 'cat', 'panda'];
-        
-        let canvas, ctx;
-        let width, height;
-        let particles = [];
-        let audioCtx = null;
-        let bgImage = null; 
-        
-        // Firebase Config
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        // --- CẤU HÌNH FIREBASE ---
+        const firebaseConfig = JSON.parse(__firebase_config || "{}");
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        let db, auth, user = null;
 
-        // State Game
+        if (firebaseConfig.apiKey) {
+            const app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        }
+
+        // --- TRẠNG THÁI GAME ---
+        const ANIMAL_TYPES = ['pig', 'chicken', 'frog', 'bear', 'cat', 'panda'];
         const state = {
             classLists: {
-                "Lớp mặc định": ["Nguyễn Văn A", "Trần Thị B", "Lê Văn C", "Hoàng Thị D", "Phạm Văn E", "Vũ Thị F", "Đặng Văn G", "Bùi Thị H"]
+                "Lớp 1": ["An", "Bình", "Chi", "Dũng", "Em", "Giang", "Hùng", "Lan"]
             },
-            currentClass: "Lớp mặc định",
+            currentClass: "Lớp 1",
             names: [],
             animals: [],
             mode: 'IDLE',
             winners: [],
             cooldown: 0,
-            user: null,
-            cameraActive: false // Thêm trạng thái camera
+            cameraActive: false
         };
 
+        let canvas, ctx, width, height;
+        let particles = [];
+        let audioCtx = null;
+        let bgImage = null;
         let handLandmarker;
         let video;
         let lastVideoTime = -1;
-
-        // --- HỆ THỐNG ÂM THANH ---
-        function initAudio() {
-            if (!audioCtx) {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                if (AudioContext) audioCtx = new AudioContext();
-            }
-            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-        }
-
-        function playWinSound() {
-            initAudio();
-            if (!audioCtx) return;
-            const t = audioCtx.currentTime;
-            const notes = [523.25, 659.25, 783.99, 1046.50]; 
-            notes.forEach((freq, i) => {
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(freq, t + i * 0.1);
-                osc.frequency.linearRampToValueAtTime(freq + 10, t + i * 0.1 + 0.1);
-                gain.connect(audioCtx.destination);
-                osc.connect(gain);
-                gain.gain.setValueAtTime(0, t + i * 0.1);
-                gain.gain.linearRampToValueAtTime(0.3, t + i * 0.1 + 0.05);
-                gain.gain.exponentialRampToValueAtTime(0.01, t + i * 0.1 + 0.4);
-                osc.start(t + i * 0.1);
-                osc.stop(t + i * 0.1 + 0.5);
-            });
-        }
-
-        // --- CỬ CHỈ & LOGIC ---
-        function setupUIHandlers() {
-            const classSelector = document.getElementById('classSelector');
-            const newClassInput = document.getElementById('newClassName');
-            const addClassBtn = document.getElementById('addClassBtn');
-            const deleteClassBtn = document.getElementById('deleteClassBtn');
-            const manualInput = document.getElementById('manualInput');
-            const manualBtn = document.getElementById('manualBtn');
-            const saveCloudBtn = document.getElementById('saveCloudBtn');
-            const resetBtn = document.getElementById('resetBtn');
-
-            const updateClassSelectorUI = () => {
-                classSelector.innerHTML = '';
-                Object.keys(state.classLists).forEach(name => {
-                    const opt = document.createElement('option');
-                    opt.value = name;
-                    opt.innerText = name;
-                    opt.selected = name === state.currentClass;
-                    classSelector.appendChild(opt);
-                });
-                document.getElementById('currentClassLabel').innerText = state.currentClass;
-                manualInput.value = (state.classLists[state.currentClass] || []).join('\n');
-            };
-
-            classSelector.addEventListener('change', (e) => {
-                state.currentClass = e.target.value;
-                state.names = [...(state.classLists[state.currentClass] || [])];
-                resetGame();
-                updateClassSelectorUI();
-            });
-
-            addClassBtn.addEventListener('click', () => {
-                const name = newClassInput.value.trim();
-                if (name && !state.classLists[name]) {
-                    state.classLists[name] = [];
-                    state.currentClass = name;
-                    state.names = [];
-                    newClassInput.value = '';
-                    updateClassSelectorUI();
-                    resetGame();
-                    saveToCloud(false);
-                }
-            });
-
-            let deleteConfirmMode = false;
-            deleteClassBtn.addEventListener('click', () => {
-                const keys = Object.keys(state.classLists);
-                if (keys.length <= 1) {
-                    showStatus("Cần giữ ít nhất 1 lớp học!", "#ef4444");
-                    return;
-                }
-
-                if (!deleteConfirmMode) {
-                    deleteConfirmMode = true;
-                    deleteClassBtn.innerText = "XÁC NHẬN XÓA?";
-                    deleteClassBtn.classList.replace('bg-red-100', 'bg-red-600');
-                    deleteClassBtn.classList.replace('text-red-600', 'text-white');
-                    
-                    setTimeout(() => {
-                        deleteConfirmMode = false;
-                        deleteClassBtn.innerText = "XÓA LỚP";
-                        deleteClassBtn.classList.replace('bg-red-600', 'bg-red-100');
-                        deleteClassBtn.classList.replace('text-white', 'text-red-600');
-                    }, 3000);
-                } else {
-                    delete state.classLists[state.currentClass];
-                    state.currentClass = Object.keys(state.classLists)[0];
-                    state.names = [...(state.classLists[state.currentClass] || [])];
-                    
-                    deleteConfirmMode = false;
-                    deleteClassBtn.innerText = "XÓA LỚP";
-                    deleteClassBtn.classList.replace('bg-red-600', 'bg-red-100');
-                    deleteClassBtn.classList.replace('text-white', 'text-red-600');
-                    
-                    updateClassSelectorUI();
-                    resetGame();
-                    saveToCloud(false);
-                    showStatus("Đã xóa lớp thành công", "#22c55e");
-                }
-            });
-
-            manualBtn.addEventListener('click', () => {
-                const newNames = manualInput.value.split(/\r?\n/).map(n => n.trim()).filter(n => n.length > 0);
-                state.classLists[state.currentClass] = newNames;
-                state.names = newNames;
-                resetGame();
-                showStatus("Đã cập nhật danh sách học sinh", "#22c55e");
-            });
-
-            resetBtn.addEventListener('click', () => {
-                state.classLists[state.currentClass] = [];
-                state.names = [];
-                resetGame();
-                manualInput.value = '';
-                showStatus("Đã xóa hết học sinh lớp này", "#f97316");
-            });
-
-            saveCloudBtn.addEventListener('click', () => saveToCloud(true));
-
-            const bgmPlayer = document.getElementById('bgmPlayer');
-            document.getElementById('bgmInput').addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    bgmPlayer.src = URL.createObjectURL(file);
-                    bgmPlayer.play();
-                }
-            });
-            document.getElementById('bgInput').addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const img = new Image();
-                    img.onload = () => { bgImage = img; };
-                    img.src = URL.createObjectURL(file);
-                }
-            });
-
-            window.updateClassSelectorUI = updateClassSelectorUI;
-        }
-
-        function showStatus(msg, color = "#FFFFFF") {
-            const statusText = document.getElementById('status-text');
-            statusText.innerText = msg;
-            statusText.style.color = color;
-        }
-
-        // --- CLOUD STORAGE LOGIC ---
-        async function saveToCloud(showNotif = true) {
-            if (!state.user) return;
-            try {
-                const configDoc = doc(db, 'artifacts', appId, 'users', state.user.uid, 'settings', 'classConfig');
-                await setDoc(configDoc, {
-                    classLists: state.classLists,
-                    currentClass: state.currentClass,
-                    updatedAt: Date.now()
-                });
-                if (showNotif) showStatus("Đã lưu lên đám mây ✨", "#22c55e");
-            } catch (error) {
-                console.error(error);
-                if (showNotif) showStatus("Lỗi kết nối khi lưu", "#ef4444");
-            }
-        }
-
-        async function loadFromCloud() {
-            if (!state.user) return;
-            try {
-                const configDoc = doc(db, 'artifacts', appId, 'users', state.user.uid, 'settings', 'classConfig');
-                const snap = await getDoc(configDoc);
-                if (snap.exists()) {
-                    const data = snap.data();
-                    state.classLists = data.classLists;
-                    state.currentClass = data.currentClass || Object.keys(data.classLists)[0];
-                    state.names = [...(state.classLists[state.currentClass] || [])];
-                    window.updateClassSelectorUI();
-                    resetGame();
-                    showStatus("Đã tải dữ liệu lớp học", "#22c55e");
-                } else {
-                    showStatus("Chào mừng bạn!", "#FFFFFF");
-                }
-            } catch (error) {
-                console.error(error);
-            }
-        }
-
-        // --- KHỞI TẠO ---
-        window.onload = async () => {
-            canvas = document.getElementById('game-canvas');
-            ctx = canvas.getContext('2d');
-            resize();
-            window.addEventListener('resize', resize);
-
-            setupUIHandlers();
-            
-            document.body.addEventListener('click', initAudio, { once: true });
-            
-            const menuBtn = document.getElementById('menu-btn');
-            const uiPanel = document.getElementById('ui-panel');
-            menuBtn.addEventListener('click', () => uiPanel.classList.toggle('panel-hidden'));
-            document.addEventListener('click', (e) => {
-                if (!uiPanel.contains(e.target) && !menuBtn.contains(e.target)) uiPanel.classList.add('panel-hidden');
-            });
-
-            state.names = [...(state.classLists[state.currentClass] || [])];
-            window.updateClassSelectorUI();
-
-            onAuthStateChanged(auth, (user) => {
-                state.user = user;
-                if (user) loadFromCloud();
-            });
-
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
-            }
-
-            createAnimals();
-            await setupVision();
-            document.getElementById('loading').classList.add('opacity-0', 'pointer-events-none');
-            requestAnimationFrame(gameLoop);
-        };
-
-        function resize() {
-            width = canvas.width = window.innerWidth;
-            height = canvas.height = window.innerHeight;
-            if(state.mode === 'IDLE') arrangeAnimalsGrid();
-        }
 
         // --- CLASS ANIMAL ---
         class Animal {
@@ -555,21 +285,14 @@
                 this.targetSize = 50;
                 this.angle = 0;
                 this.isWinner = false;
-                this.assignedWidth = 100;
             }
 
             update() {
                 this.x += (this.targetX - this.x) * 0.1;
                 this.y += (this.targetY - this.y) * 0.1;
                 this.size += (this.targetSize - this.size) * 0.1;
-
                 if (state.mode === 'SHUFFLING') {
-                    this.x += (Math.random() - 0.5) * 10;
-                    this.y += (Math.random() - 0.5) * 10;
                     this.angle = Math.sin(Date.now() / 100) * 0.2;
-                } else if (state.mode === 'WINNER' && this.isWinner) {
-                    this.y += Math.sin(Date.now() / 150) * 2;
-                    this.angle = 0;
                 } else {
                     this.angle = 0;
                 }
@@ -579,62 +302,28 @@
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.angle);
-                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                
+                // Shadow
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
                 ctx.beginPath();
-                ctx.ellipse(0, this.size/1.4, this.size/1.2, this.size/4, 0, 0, Math.PI * 2);
+                ctx.ellipse(0, this.size/1.5, this.size/1.2, this.size/4, 0, 0, Math.PI * 2);
                 ctx.fill();
+
                 this.drawIcon(ctx, this.size);
                 
-                const labelY = this.size * 0.85;
-                const maxBoxWidth = this.isWinner ? Math.min(width * 0.9, 800) : (this.assignedWidth || width) * 0.95;
-                
-                let fontSize = this.isWinner ? this.size * 0.5 : this.size * 0.35;
-                ctx.font = `bold ${fontSize}px Arial`;
-
-                const words = this.name.split(' ');
-                let lines = [];
-                let currentLine = words[0];
-
-                for (let i = 1; i < words.length; i++) {
-                    const word = words[i];
-                    const w = ctx.measureText(currentLine + " " + word).width;
-                    if (w < maxBoxWidth - 20) {
-                        currentLine += " " + word;
-                    } else {
-                        lines.push(currentLine);
-                        currentLine = word;
-                    }
-                }
-                lines.push(currentLine);
-
-                let maxLineWidth = 0;
-                lines.forEach(l => {
-                    const w = ctx.measureText(l).width;
-                    if (w > maxLineWidth) maxLineWidth = w;
-                });
-
-                if (maxLineWidth > maxBoxWidth - 20) {
-                    const scale = (maxBoxWidth - 20) / maxLineWidth;
-                    fontSize *= scale;
-                    ctx.font = `bold ${fontSize}px Arial`;
-                    maxLineWidth = maxLineWidth * scale;
-                }
-
-                const lineHeight = fontSize * 1.3; 
-                const totalTextHeight = lines.length * lineHeight;
-                const boxHeight = totalTextHeight + (fontSize * 0.8); 
-                const boxWidth = Math.max(this.size * 1.5, maxLineWidth + (fontSize * 1.5));
-
-                ctx.fillStyle = '#5D4037'; 
+                // Name Tag
+                const tagW = Math.max(80, ctx.measureText(this.name).width + 30);
+                const tagH = this.isWinner ? this.size * 0.7 : this.size * 0.5;
+                ctx.fillStyle = '#5D4037';
                 ctx.beginPath();
-                ctx.roundRect(-boxWidth/2, labelY, boxWidth, boxHeight, 8);
+                ctx.roundRect(-tagW/2, this.size * 0.8, tagW, tagH, 8);
                 ctx.fill();
-                ctx.strokeStyle = '#8D6E63'; ctx.lineWidth = 2; ctx.stroke();
-
-                ctx.fillStyle = '#FFF8E1'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                const startY = labelY + (boxHeight - totalTextHeight) / 2 + (lineHeight / 2);
-                lines.forEach((line, i) => ctx.fillText(line, 0, startY + i * lineHeight));
-
+                
+                ctx.fillStyle = '#FFF';
+                ctx.font = `bold ${tagH * 0.6}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.fillText(this.name, 0, this.size * 0.8 + tagH/1.5);
+                
                 ctx.restore();
             }
 
@@ -642,219 +331,364 @@
                 const r = s * 0.8;
                 switch(this.type) {
                     case 'pig':
-                        drawCircle(ctx, -r*0.6, -r*0.7, r*0.3, '#E91E63', '#880E4F');
-                        drawCircle(ctx, r*0.6, -r*0.7, r*0.3, '#E91E63', '#880E4F');
                         drawCircle(ctx, 0, 0, r, '#F06292', '#880E4F');
                         drawOval(ctx, 0, r*0.2, r*0.35, r*0.25, '#EC407A');
-                        drawCircle(ctx, -r*0.1, r*0.2, r*0.08, '#880E4F');
-                        drawCircle(ctx, r*0.1, r*0.2, r*0.08, '#880E4F');
-                        this.drawEyes(ctx, r);
                         break;
                     case 'frog':
-                        drawCircle(ctx, -r*0.5, -r*0.7, r*0.35, '#66BB6A', '#1B5E20');
-                        drawCircle(ctx, r*0.5, -r*0.7, r*0.35, '#66BB6A', '#1B5E20');
-                        drawOval(ctx, 0, 0, r, r*0.8, '#43A047', '#1B5E20');
-                        drawCircle(ctx, -r*0.6, r*0.1, r*0.15, 'rgba(233,30,99,0.5)');
-                        drawCircle(ctx, r*0.6, r*0.1, r*0.15, 'rgba(233,30,99,0.5)');
-                        ctx.beginPath(); ctx.arc(0, 0, r*0.5, 0.2, Math.PI - 0.2); ctx.strokeStyle = '#1B5E20'; ctx.stroke();
-                        drawCircle(ctx, -r*0.5, -r*0.7, r*0.12, 'black');
-                        drawCircle(ctx, r*0.5, -r*0.7, r*0.12, 'black');
+                        drawCircle(ctx, 0, 0, r, '#66BB6A', '#1B5E20');
                         break;
                     case 'chicken':
-                        drawCircle(ctx, 0, -r*0.8, r*0.25, '#D32F2F');
-                        drawCircle(ctx, -r*0.3, -r*0.7, r*0.2, '#D32F2F');
-                        drawCircle(ctx, r*0.3, -r*0.7, r*0.2, '#D32F2F');
-                        drawCircle(ctx, 0, 0, r*0.9, '#FFFFFF', '#FBC02D');
-                        ctx.beginPath(); ctx.moveTo(-r*0.15, r*0.1); ctx.lineTo(r*0.15, r*0.1); ctx.lineTo(0, r*0.4); ctx.fillStyle = '#F57C00'; ctx.fill();
-                        this.drawEyes(ctx, r);
+                        drawCircle(ctx, 0, 0, r, '#FFF', '#FBC02D');
                         break;
                     case 'bear':
-                        drawCircle(ctx, -r*0.7, -r*0.6, r*0.3, '#5D4037', '#3E2723');
-                        drawCircle(ctx, r*0.7, -r*0.6, r*0.3, '#5D4037', '#3E2723');
                         drawCircle(ctx, 0, 0, r, '#795548', '#3E2723');
-                        drawOval(ctx, 0, r*0.2, r*0.4, r*0.3, '#D7CCC8');
-                        drawOval(ctx, 0, r*0.1, r*0.15, r*0.1, '#3E2723');
-                        this.drawEyes(ctx, r);
                         break;
                     case 'cat':
-                        ctx.fillStyle = '#FFA726'; ctx.strokeStyle = '#E65100';
-                        ctx.beginPath(); ctx.moveTo(-r*0.7, -r*0.2); ctx.lineTo(-r*0.9, -r*0.9); ctx.lineTo(-r*0.2, -r*0.7); ctx.fill(); ctx.stroke();
-                        ctx.beginPath(); ctx.moveTo(r*0.7, -r*0.2); ctx.lineTo(r*0.9, -r*0.9); ctx.lineTo(r*0.2, -r*0.7); ctx.fill(); ctx.stroke();
                         drawCircle(ctx, 0, 0, r, '#FFA726', '#E65100');
-                        drawCircle(ctx, 0, r*0.2, r*0.1, '#E65100');
-                        this.drawEyes(ctx, r);
                         break;
                     case 'panda':
-                        drawCircle(ctx, -r*0.7, -r*0.6, r*0.3, '#212121');
-                        drawCircle(ctx, r*0.7, -r*0.6, r*0.3, '#212121');
                         drawCircle(ctx, 0, 0, r, '#FAFAFA', '#9E9E9E');
-                        drawOval(ctx, -r*0.35, -r*0.1, r*0.25, r*0.2, '#212121');
-                        drawOval(ctx, r*0.35, -r*0.1, r*0.25, r*0.2, '#212121');
-                        drawCircle(ctx, -r*0.35, -r*0.15, r*0.08, 'white');
-                        drawCircle(ctx, r*0.35, -r*0.15, r*0.08, 'white');
                         break;
                 }
-            }
-
-            drawEyes(ctx, r) {
-                drawCircle(ctx, -r*0.3, -r*0.15, r*0.1, 'black');
-                drawCircle(ctx, r*0.3, -r*0.15, r*0.1, 'black');
+                // Eyes
+                drawCircle(ctx, -r*0.3, -r*0.1, r*0.1, 'black');
+                drawCircle(ctx, r*0.3, -r*0.1, r*0.1, 'black');
             }
         }
 
-        function createAnimals() {
-            state.animals = state.names.map((name, idx) => new Animal(name, idx));
-            arrangeAnimalsGrid();
-        }
+        // --- XỬ LÝ GIAO DIỆN ---
+        function updateSelector() {
+            const classSelector = document.getElementById('classSelector');
+            const manualInput = document.getElementById('manualInput');
+            const currentClassLabel = document.getElementById('currentClassLabel');
 
-        function arrangeAnimalsGrid() {
-            const count = state.animals.length;
-            const aspectRatio = width / height;
-            let cols = Math.ceil(Math.sqrt(count * aspectRatio));
-            let rows = Math.ceil(count / cols);
-            if (cols * rows < count) rows++;
-            const safeW = width * 0.95, safeH = height * 0.85; 
-            const cellW = safeW / cols, cellH = safeH / rows;
-            const cellSize = Math.min(cellW, cellH); 
-            const gridW = cols * cellW, gridH = rows * cellH;
-            const startX = (width - gridW) / 2, startY = (height - gridH) / 2;
-
-            state.animals.forEach((anim, i) => {
-                const c = i % cols, r = Math.floor(i / cols);
-                anim.targetX = startX + c * cellW + cellW / 2;
-                anim.targetY = startY + r * cellH + cellH / 2;
-                anim.assignedWidth = cellW;
-                anim.targetSize = Math.min(65, Math.max(15, cellSize * 0.40)); 
-                anim.isWinner = false;
-            });
-        }
-
-        function handleLogic(gesture) {
-            if (gesture === 'OPEN_PALM' && state.mode === 'WINNER') state.cooldown = 0; 
-            if (state.cooldown > 0) { state.cooldown--; return; }
-
-            if (gesture === 'OPEN_PALM' && state.mode !== 'SHUFFLING') {
-                state.mode = 'SHUFFLING';
-                showStatus("🌪️ Đang xoay vòng...", "#FFD700");
-                state.winners = []; state.animals.forEach(a => a.isWinner = false);
-                if(window.shuffleInterval) clearInterval(window.shuffleInterval);
-                window.shuffleInterval = setInterval(() => {
-                    if(state.mode !== 'SHUFFLING') return clearInterval(window.shuffleInterval);
-                    state.animals.forEach(anim => {
-                        anim.targetX = Math.random() * (width - 100) + 50;
-                        anim.targetY = Math.random() * (height - 100) + 50;
-                    });
-                }, 500);
-            } else if ((gesture === 'ONE' || gesture === 'TWO' || gesture === 'THREE') && state.mode === 'SHUFFLING') {
-                let count = gesture === 'THREE' ? 3 : (gesture === 'TWO' ? 2 : 1);
-                state.mode = 'WINNER';
-                showStatus(`🎉 Chúc mừng ${count} bạn!`, "#76ff03");
-                pickWinners(count);
-                state.cooldown = 50; 
-            } else if (state.mode === 'IDLE') {
-                showStatus("Sẵn sàng!", "#FFFFFF");
+            if (classSelector) {
+                classSelector.innerHTML = '';
+                Object.keys(state.classLists).forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = opt.innerText = c;
+                    opt.selected = c === state.currentClass;
+                    classSelector.appendChild(opt);
+                });
+            }
+            
+            if (manualInput) {
+                manualInput.value = (state.classLists[state.currentClass] || []).join('\n');
+            }
+            
+            if (currentClassLabel) {
+                currentClassLabel.innerText = state.currentClass;
             }
         }
 
-        function pickWinners(count) {
-            let indices = [];
-            while(indices.length < count && indices.length < state.animals.length) {
-                let r = Math.floor(Math.random() * state.animals.length);
-                if(!indices.includes(r)) indices.push(r);
-            }
-            state.winners = indices; playWinSound();
-            const centerX = width / 2, marginY = height * 0.15;
-            const availableHeight = height - (2 * marginY);
-            const slotHeight = availableHeight / count; 
-            const finalSize = Math.min(180, Math.max(50, (slotHeight * 0.85) / 3.2));
+        function initUI() {
+            const menuBtn = document.getElementById('menu-btn');
+            const panel = document.getElementById('ui-panel');
+            const classSelector = document.getElementById('classSelector');
 
-            state.animals.forEach((anim, idx) => {
-                if (indices.includes(idx)) {
-                    anim.isWinner = true;
-                    const winPosIndex = indices.indexOf(idx);
-                    anim.targetX = centerX;
-                    anim.targetY = marginY + (winPosIndex * slotHeight) + (slotHeight / 2);
-                    anim.targetSize = finalSize;
-                    anim.assignedWidth = width * 0.9; 
-                    createConfetti(anim.targetX, anim.targetY);
-                } else {
-                    const angle = Math.random() * Math.PI * 2;
-                    anim.targetX = centerX + Math.cos(angle) * (width/1.3);
-                    anim.targetY = (height/2) + Math.sin(angle) * (width/1.3);
-                    anim.targetSize = 20; 
+            if (menuBtn && panel) {
+                menuBtn.onclick = () => panel.classList.toggle('panel-hidden');
+            }
+
+            if (classSelector) {
+                classSelector.onchange = (e) => {
+                    state.currentClass = e.target.value;
+                    state.names = [...(state.classLists[state.currentClass] || [])];
+                    resetGame();
+                    updateSelector();
+                };
+            }
+
+            document.getElementById('addClassBtn').onclick = () => {
+                const nameInput = document.getElementById('newClassName');
+                const name = nameInput.value.trim();
+                if (name && !state.classLists[name]) {
+                    state.classLists[name] = [];
+                    state.currentClass = name;
+                    state.names = [];
+                    nameInput.value = '';
+                    updateSelector();
+                    resetGame();
+                    saveToCloud(false);
                 }
-            });
-        }
+            };
 
-        function resetGame() {
-            state.mode = 'IDLE'; state.cooldown = 0; state.winners = [];
-            createAnimals();
+            document.getElementById('deleteClassBtn').onclick = () => {
+                const keys = Object.keys(state.classLists);
+                if (keys.length <= 1) return showStatus("Cần ít nhất 1 lớp!", "#ef4444");
+                delete state.classLists[state.currentClass];
+                state.currentClass = Object.keys(state.classLists)[0];
+                state.names = [...(state.classLists[state.currentClass] || [])];
+                updateSelector();
+                resetGame();
+                saveToCloud(false);
+            };
+
+            document.getElementById('manualBtn').onclick = () => {
+                const lines = document.getElementById('manualInput').value.split('\n').map(l => l.trim()).filter(l => l);
+                state.classLists[state.currentClass] = lines;
+                state.names = lines;
+                resetGame();
+                showStatus("Đã cập nhật!", "#22c55e");
+            };
+
+            document.getElementById('resetNamesBtn').onclick = () => {
+                state.classLists[state.currentClass] = [];
+                state.names = [];
+                resetGame();
+                updateSelector();
+                showStatus("Đã xóa danh sách!", "#f97316");
+            };
+
+            document.getElementById('saveCloudBtn').onclick = () => saveToCloud(true);
+
+            // File Handling
+            document.getElementById('fileInput').onchange = handleFileUpload;
+
+            // Audio & Background
+            document.getElementById('bgmInput').onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const player = document.getElementById('bgmPlayer');
+                    player.src = URL.createObjectURL(file);
+                    player.play();
+                }
+            };
+
+            document.getElementById('bgInput').onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const img = new Image();
+                    img.onload = () => { bgImage = img; };
+                    img.src = URL.createObjectURL(file);
+                }
+            };
+
+            updateSelector();
         }
 
         async function handleFileUpload(e) {
-            const file = e.target.files[0]; if (!file) return;
+            const file = e.target.files[0];
+            if (!file) return;
             try {
                 let newNames = [];
-                if (file.name.endsWith('.xlsx')) {
+                if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
                     const data = await file.arrayBuffer();
                     const workbook = XLSX.read(data);
                     const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1});
                     newNames = jsonData.flat().map(n => String(n).trim()).filter(n => n.length > 0);
+                } else if (file.name.endsWith('.docx')) {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const result = await mammoth.extractRawText({arrayBuffer});
+                    newNames = result.value.split(/[\n,]+/).map(n => n.trim()).filter(n => n.length > 0);
                 } else {
                     const text = await file.text();
                     newNames = text.split(/[\n,]+/).map(n => n.trim()).filter(n => n.length > 0);
                 }
+
                 if (newNames.length > 0) {
                     state.classLists[state.currentClass] = newNames;
                     state.names = newNames;
                     resetGame();
-                    window.updateClassSelectorUI();
+                    updateSelector();
                     showStatus("Đã tải học sinh từ file!", "#22c55e");
                 }
-            } catch (err) { showStatus("Lỗi khi đọc file", "#ef4444"); }
-            e.target.value = '';
+            } catch (err) {
+                showStatus("Lỗi khi đọc file", "#ef4444");
+            }
         }
 
-        function drawBackground() {
-            if (bgImage) {
-                const scale = Math.max(width / bgImage.width, height / bgImage.height);
-                ctx.drawImage(bgImage, (width/2)-(bgImage.width/2)*scale, (height/2)-(bgImage.height/2)*scale, bgImage.width*scale, bgImage.height*scale);
-            } else {
-                const gradient = ctx.createLinearGradient(0, 0, 0, height);
-                gradient.addColorStop(0, "#4FC3F7"); gradient.addColorStop(0.5, "#B3E5FC");
-                gradient.addColorStop(0.5, "#7CB342"); gradient.addColorStop(1, "#33691E");
-                ctx.fillStyle = gradient; ctx.fillRect(0, 0, width, height);
+        async function saveToCloud(notify) {
+            if (!user || !db) return;
+            try {
+                const configDoc = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'classConfig');
+                await setDoc(configDoc, {
+                    classLists: state.classLists,
+                    currentClass: state.currentClass,
+                    updatedAt: Date.now()
+                });
+                if (notify) showStatus("Đã đồng bộ lên Cloud! ✨", "#22c55e");
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadFromCloud() {
+            if (!user || !db) return;
+            try {
+                const configDoc = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'classConfig');
+                const snap = await getDoc(configDoc);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    state.classLists = data.classLists;
+                    state.currentClass = data.currentClass || Object.keys(data.classLists)[0];
+                    state.names = [...(state.classLists[state.currentClass] || [])];
+                    updateSelector();
+                    resetGame();
+                    showStatus("Dữ liệu đã sẵn sàng!", "#22c55e");
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function showStatus(msg, color) {
+            const el = document.getElementById('status-text');
+            if (el) {
+                el.innerText = msg;
+                el.style.color = color || "#FFF";
+            }
+        }
+
+        // --- CÔNG CỤ GAME ---
+        function resetGame() {
+            state.mode = 'IDLE';
+            state.cooldown = 0;
+            state.winners = [];
+            state.animals = state.names.map((n, i) => new Animal(n, i));
+            arrangeGrid();
+        }
+
+        function arrangeGrid() {
+            const count = state.animals.length;
+            if (count === 0) return;
+            const cols = Math.ceil(Math.sqrt(count * (width / height)));
+            const rows = Math.ceil(count / cols);
+            const cellW = (width * 0.9) / cols;
+            const cellH = (height * 0.8) / rows;
+            const startX = (width - (cols * cellW)) / 2 + cellW/2;
+            const startY = (height - (rows * cellH)) / 2 + cellH/2;
+
+            state.animals.forEach((a, i) => {
+                const r = Math.floor(i / cols);
+                const c = i % cols;
+                a.targetX = startX + c * cellW;
+                a.targetY = startY + r * cellH;
+                a.targetSize = Math.min(cellW, cellH) * 0.4;
+                a.isWinner = false;
+            });
+        }
+
+        function pickWinners(count) {
+            if (state.animals.length === 0) return;
+            let pool = state.animals.map((_, i) => i);
+            let indices = [];
+            for (let i = 0; i < count && pool.length > 0; i++) {
+                indices.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+            }
+            
+            state.mode = 'WINNER';
+            indices.forEach((idx, i) => {
+                const a = state.animals[idx];
+                a.isWinner = true;
+                a.targetX = width / 2;
+                a.targetY = height / 2 + (i - (indices.length-1)/2) * 150;
+                a.targetSize = 120;
+                createConfetti(a.targetX, a.targetY);
+            });
+
+            state.animals.forEach((a, i) => {
+                if (!indices.includes(i)) {
+                    const angle = Math.random() * Math.PI * 2;
+                    a.targetX = width/2 + Math.cos(angle) * width;
+                    a.targetY = height/2 + Math.sin(angle) * height;
+                    a.targetSize = 10;
+                }
+            });
+            playWinSound();
+        }
+
+        function handleGesture(gesture) {
+            if (gesture === 'OPEN_PALM' && state.mode === 'WINNER') state.cooldown = 0;
+            if (state.cooldown > 0) { state.cooldown--; return; }
+
+            if (gesture === 'OPEN_PALM' && state.mode !== 'SHUFFLING') {
+                if (state.animals.length === 0) return;
+                state.mode = 'SHUFFLING';
+                showStatus("🌪️ Đang xoay vòng...", "#FFD700");
+                if (window.shuffleInt) clearInterval(window.shuffleInt);
+                window.shuffleInt = setInterval(() => {
+                    if (state.mode !== 'SHUFFLING') return clearInterval(window.shuffleInt);
+                    state.animals.forEach(a => {
+                        a.targetX = Math.random() * width;
+                        a.targetY = Math.random() * height;
+                    });
+                }, 400);
+            } else if (['ONE', 'TWO', 'THREE'].includes(gesture) && state.mode === 'SHUFFLING') {
+                const count = gesture === 'ONE' ? 1 : (gesture === 'TWO' ? 2 : 3);
+                pickWinners(count);
+                showStatus(`🎉 Chúc mừng ${count} bạn!`, "#22c55e");
+                state.cooldown = 60;
             }
         }
 
         function createConfetti(x, y) {
-            for(let i=0; i<40; i++) {
+            for (let i = 0; i < 30; i++) {
                 particles.push({
-                    x, y, vx: (Math.random()-0.5)*20, vy: (Math.random()-0.5)*20-5,
-                    color: `hsl(${Math.random()*360}, 100%, 50%)`, life: 120
+                    x, y,
+                    vx: (Math.random() - 0.5) * 15,
+                    vy: (Math.random() - 0.5) * 15 - 5,
+                    color: `hsl(${Math.random()*360}, 80%, 60%)`,
+                    life: 100
                 });
             }
         }
 
-        function drawParticles() {
-            for(let i = particles.length - 1; i >= 0; i--) {
-                let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.4; p.life--;
-                ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 8, 8);
-                if(p.life <= 0) particles.splice(i, 1);
-            }
+        function playWinSound() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            osc.connect(g); g.connect(audioCtx.destination);
+            osc.frequency.setValueAtTime(523, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1046, audioCtx.currentTime + 0.5);
+            g.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.5);
         }
 
+        // --- VÒNG LẶP CHÍNH ---
         function gameLoop() {
-            ctx.clearRect(0, 0, width, height); drawBackground();
-            const losers = state.animals.filter(a => !a.isWinner), winners = state.animals.filter(a => a.isWinner);
-            losers.forEach(anim => { anim.update(); anim.draw(ctx); });
-            if (state.mode === 'WINNER') { ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, width, height); }
-            winners.forEach(anim => { anim.update(); anim.draw(ctx); });
-            drawParticles(); processVision();
+            ctx.clearRect(0, 0, width, height);
+            
+            // Background
+            if (bgImage) {
+                const s = Math.max(width/bgImage.width, height/bgImage.height);
+                ctx.drawImage(bgImage, (width-bgImage.width*s)/2, (height-bgImage.height*s)/2, bgImage.width*s, bgImage.height*s);
+            } else {
+                const g = ctx.createLinearGradient(0,0,0,height);
+                g.addColorStop(0, '#4FC3F7'); g.addColorStop(1, '#81C784');
+                ctx.fillStyle = g; ctx.fillRect(0,0,width,height);
+            }
+
+            if (state.mode === 'WINNER') {
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(0,0,width,height);
+            }
+
+            state.animals.forEach(a => { a.update(); a.draw(ctx); });
+
+            particles.forEach((p, i) => {
+                p.x += p.vx; p.y += p.vy; p.vy += 0.3; p.life--;
+                ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 6, 6);
+                if (p.life <= 0) particles.splice(i, 1);
+            });
+
+            // Vision
+            if (state.cameraActive && handLandmarker && video.currentTime !== lastVideoTime) {
+                lastVideoTime = video.currentTime;
+                const result = handLandmarker.detectForVideo(video, Date.now());
+                if (result.landmarks.length > 0) {
+                    const lm = result.landmarks[0];
+                    const isUp = (t, p) => lm[t].y < lm[p].y;
+                    const c = [8,12,16,20].filter(idx => isUp(idx, idx-2)).length;
+                    let g = 'NONE';
+                    if (c >= 4) g = 'OPEN_PALM';
+                    else if (c === 1) g = 'ONE';
+                    else if (c === 2) g = 'TWO';
+                    else if (c === 3) g = 'THREE';
+                    handleGesture(g);
+                }
+            }
+
             requestAnimationFrame(gameLoop);
         }
 
-        // --- CÀI ĐẶT CAMERA & MEDIA PIPE ---
         async function setupVision() {
             try {
                 const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
@@ -862,61 +696,38 @@
                     baseOptions: { modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`, delegate: "GPU" },
                     runningMode: "VIDEO", numHands: 1
                 });
-                
                 video = document.getElementById("camera-feed");
-                
-                // Thử khởi tạo camera với xử lý lỗi NotFoundError
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { 
-                            width: 640, 
-                            height: 480,
-                            facingMode: "user" 
-                        } 
-                    });
-                    video.srcObject = stream;
-                    state.cameraActive = true;
-                    return new Promise(resolve => { video.onloadeddata = resolve; });
-                } catch (mediaError) {
-                    console.warn("MediaDevice Error:", mediaError);
-                    state.cameraActive = false;
-                    
-                    if (mediaError.name === 'NotFoundError' || mediaError.name === 'DevicesNotFoundError') {
-                        showStatus("Không tìm thấy Camera! Hãy cắm webcam.", "#ef4444");
-                    } else if (mediaError.name === 'NotAllowedError' || mediaError.name === 'PermissionDeniedError') {
-                        showStatus("Vui lòng cho phép quyền truy cập Camera!", "#ef4444");
-                    } else {
-                        showStatus("Lỗi Camera: " + mediaError.message, "#ef4444");
-                    }
-                    // Trả về một promise giả để không chặn luồng khởi tạo ứng dụng
-                    return Promise.resolve();
-                }
-            } catch (err) {
-                console.error("Vision Setup Error:", err);
-                showStatus("Lỗi khởi tạo AI!", "#ef4444");
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                video.srcObject = stream;
+                state.cameraActive = true;
+                return new Promise(r => video.onloadeddata = r);
+            } catch (e) {
+                showStatus("Không có Camera!", "#ef4444");
                 return Promise.resolve();
             }
         }
 
-        function processVision() {
-            // Chỉ xử lý nếu camera đang hoạt động và có dữ liệu
-            if (state.cameraActive && handLandmarker && video.currentTime !== lastVideoTime && video.readyState >= 2) {
-                lastVideoTime = video.currentTime;
-                const result = handLandmarker.detectForVideo(video, Date.now());
-                if (result.landmarks.length > 0) handleLogic(detectGesture(result.landmarks[0]));
+        window.onload = async () => {
+            canvas = document.getElementById('game-canvas');
+            ctx = canvas.getContext('2d');
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            window.onresize = () => { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; arrangeGrid(); };
+            
+            document.body.onclick = () => { if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); };
+            
+            initUI();
+            if (auth) {
+                onAuthStateChanged(auth, u => { user = u; if(u) loadFromCloud(); });
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
+                else await signInAnonymously(auth);
             }
-        }
 
-        function detectGesture(lm) {
-            const isUp = (t, p) => lm[t].y < lm[p].y;
-            const i=isUp(8,6), m=isUp(12,10), r=isUp(16,14), p=isUp(20,18);
-            let c=0; if(i)c++; if(m)c++; if(r)c++; if(p)c++;
-            if(c>=4) return 'OPEN_PALM';
-            if(i&&m&&r&&!p) return 'THREE';
-            if(i&&m&&!r&&!p) return 'TWO';
-            if(i&&!m&&!r&&!p) return 'ONE';
-            return 'NONE';
-        }
+            resetGame();
+            await setupVision();
+            document.getElementById('loading').style.display = 'none';
+            gameLoop();
+        };
     </script>
 </body>
 </html>
